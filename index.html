@@ -171,6 +171,24 @@
             border: 1px solid #e2e8f0;
         }
         .keywords { font-style: italic; color: #555; }
+         @media (max-width: 640px) {
+            body { padding: 8px; }
+            .container { padding: 15px; border-radius: 10px; }
+            h1 { font-size: 22px; }
+            .subtitle { font-size: 12px; }
+            .control-panel { flex-direction: column; align-items: stretch; }
+            .btn-group { flex-wrap: wrap; }
+            .btn-group button { flex: 1 1 40%; }
+            select { width: 100%; }
+            select, button, textarea { font-size: 16px; }
+            .timer-box { display: flex; justify-content: space-between; align-items: center; }
+            .card { padding: 15px; }
+            .question-title { font-size: 18px; }
+            .directions { font-size: 13px; padding: 12px; }
+            .action-row { flex-direction: column; align-items: stretch; gap: 8px; }
+            .word-count { text-align: center; }
+        }
+    </style>
     </style>
 </head>
 <body>
