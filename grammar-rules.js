@@ -14,8 +14,12 @@
   function isProperNoun(t) { return hasTag(t, 'ProperNoun'); }
   function isPlural(t) { return hasTag(t, 'Plural'); }
   function isSingular(t) { return hasTag(t, 'Singular'); }
+  // 复数后缀启发式：s/x 结尾且非常见单数名词/不可数名词，视为复数
+  function looksPlural(w) { w = (w || '').toLowerCase(); if (!/[sx]$/i.test(w)) return false; if (PHYS_S.test(w)) return false; if (UNCOUNTABLE[w]) return false; return true; }
 
-  var UNCOUNTABLE = {water:1,milk:1,juice:1,oil:1,rice:1,bread:1,sugar:1,salt:1,food:1,money:1,information:1,knowledge:1,advice:1,research:1,evidence:1,progress:1,news:1,furniture:1,equipment:1,baggage:1,luggage:1,traffic:1,weather:1,work:1,software:1,pollution:1,nature:1,literature:1,music:1,education:1,math:1,mathematics:1,physics:1,behaviour:1,behavior:1,'homework':1};
+  var UNCOUNTABLE = {water:1,milk:1,juice:1,oil:1,rice:1,bread:1,sugar:1,salt:1,food:1,money:1,information:1,knowledge:1,advice:1,research:1,evidence:1,progress:1,news:1,furniture:1,equipment:1,baggage:1,luggage:1,traffic:1,weather:1,work:1,software:1,pollution:1,nature:1,literature:1,music:1,education:1,math:1,mathematics:1,physics:1,behaviour:1,behavior:1,'homework':1,'meat':1,'beef':1,'pork':1,'chicken':1,'fish':1,'toast':1};
+  // a/an 之后不应误判为缺限定词单数名词的词（代词宾格、地点/时间副词、指示词等）
+  var NOUN_SKIP = {him:1,her:1,them:1,us:1,me:1,you:1,here:1,there:1,now:1,then:1,it:1,this:1,that:1,these:1,those:1,each:1,every:1};
   var MEASURE_WORDS = {cup:1,glass:1,piece:1,bottle:1,box:1,group:1,lot:1,number:1,variety:1,range:1,kind:1,type:1,bit:1,loaf:1,slice:1,bowl:1,bag:1,packet:1,pair:1,set:1,liter:1,litre:1,kilo:1,grain:1,drop:1};
   var UNIQUE_NOUNS = {sun:1,moon:1,world:1,internet:1};
   var COUNTRY_OK = {'united states':1,'united kingdom':1,us:1,usa:1,uk:1};
@@ -26,6 +30,7 @@
   var SOUND_AN = {hour:1,honest:1,honor:1,honour:1,heir:1};
   var SOUND_A = {university:1,unique:1,united:1,uniform:1,universal:1,user:1,european:1,one:1,once:1,useful:1,union:1,unit:1,use:1};
   var MODALS = {can:1,could:1,may:1,might:1,must:1,shall:1,should:1,will:1,would:1,wo:1,'won\'t':1,cannot:1,do:1,does:1,did:1};
+  var IRREG_PP = {been:1,seen:1,gone:1,done:1,met:1,taken:1,written:1,broken:1,chosen:1,spoken:1,fell:1,known:1,driven:1,eaten:1,run:1,come:1,become:1,found:1,held:1,kept:1,left:1,made:1,said:1,told:1,thought:1,shown:1,built:1,bought:1,caught:1,bring:1,brought:1,felt:1,heard:1,hit:1,understood:1,put:1,read:1,risen:1,sent:1,sung:1,stood:1,taught:1,won:1,been:1};
   var INNER_WORDS = {'together with':1,'along with':1,'as well as':1,including:1};
   var DETERMINERS = {the:1,a:1,an:1,this:1,that:1,these:1,those:1,my:1,your:1,his:1,her:1,its:1,our:1,their:1,some:1,any:1,each:1,every:1,no:1,both:1,all:1,several:1,'another':1,'other':1};
 
@@ -65,6 +70,7 @@
     var w = t.text;
     if (w === 'he' || w === 'she' || w === 'it') return { plural: false, third: true, name: w };
     if (w === 'they' || w === 'we') return { plural: true, third: false, name: w };
+    if (w === 'i' || w === 'you') return null; // 非三单，不判定
     if (isNoun(t) && !isProperNoun(t)) { var p = isPlural(t); return { plural: p, third: !p, name: w }; }
     return null;
   }
@@ -83,6 +89,19 @@
     return null;
   }
   function isDeterminer(t) { return DETERMINERS[t.text] || hasTag(t, 'Determiner'); }
+  // 判断动词是否处于不该判错的位子（情态动词/to 之后）。true=跳过不判
+  function verbBlocked(tokens, idx) {
+    for (var k = idx - 1; k >= 0; k--) {
+      var t = tokens[k];
+      if (t.text === ',' || t.text === ';' || t.text === '.' || t.text === 'and' || t.text === 'or' || t.text === 'but') return false; // 子句边界→主谓完整，可判
+      if (MODALS[t.text] || t.text === 'to') return true;          // 情态动词/to 表原形，不判
+      if (hasAnyTag(t, ['Adverb'])) continue;
+      if (t.text === 'not' || t.text === 'also' || t.text === 'always' || t.text === 'often' || t.text === 'never' || t.text === 'usually' || t.text === 'however') continue;
+      if (isDeterminer(t)) continue;
+      return false;                                                 // 已见主体/其它词，可判
+    }
+    return false;
+  }
 
   // ---------------- 冠词 ----------------
   function runArt(tokens, text, issues) {
@@ -106,7 +125,7 @@
       var n2 = tok(tokens, j + 2);
       if (na.text === 'of' || (MEASURE_WORDS[na.text] && n2 && n2.text === 'of')) continue;
       if (UNCOUNTABLE[na.text]) addIssue(issues, { ruleId:'ART-003', category:'article', confidence:'high', start:tokens[j].start, end:na.end, errorText:text.slice(tokens[j].start,na.end), message:'a/an 只能修饰单数可数名词，"' + na.raw + '" 是不可数名词', suggestion:na.raw });
-      else if (isPlural(na)) addIssue(issues, { ruleId:'ART-003', category:'article', confidence:'high', start:tokens[j].start, end:na.end, errorText:text.slice(tokens[j].start,na.end), message:'a/an 只能修饰单数可数名词，复数名词不能直接加 a/an', suggestion:na.raw });
+      else if (isPlural(na) || looksPlural(na.text)) addIssue(issues, { ruleId:'ART-003', category:'article', confidence:'high', start:tokens[j].start, end:na.end, errorText:text.slice(tokens[j].start,na.end), message:'a/an 只能修饰单数可数名词，复数名词不能直接加 a/an', suggestion:na.raw });
     }
     // ART-002 单数可数名词缺限定词（保守）
     for (var k = 1; k < n; k++) {
@@ -114,14 +133,16 @@
       if (!isNoun(t) || isProperNoun(t)) continue;
       if (isPlural(t)) continue;
       if (UNCOUNTABLE[t.text]) continue;
+      if (NOUN_SKIP[t.text]) continue;
       var prev = tok(tokens, k - 1);
-      var prev2 = tok(tokens, k - 2);
       if (!prev) continue;
       if (isDeterminer(prev)) continue;
-      // 触发条件：前一词为介词或动词，双前词为 a/an/the
+      // 触发条件：前一词为动词或介词（宾语/介词短语位置，避免主语位置误报）
       if (!hasAnyTag(prev, ['Verb']) && !hasTag(prev, 'Preposition')) continue;
-      if (prev2 && !(prev2.text === 'a' || prev2.text === 'an' || prev2.text === 'the')) continue;
-      if (/^(school|bed|work|home|hospital|prison|church)$/.test(t.text)) continue; // 零冠词习语
+      if (/^(school|bed|work|home|hospital|prison|church|foot|hand|heart|top|bottom|breakfast|lunch|dinner|once|twice|night)$/.test(t.text)) continue;
+      // 习语局部上下文放行（go to school / at home / by bus ...）
+      var ctx = text.slice(Math.max(0, t.start - 18), t.end + 4).toLowerCase();
+      if (/(go to school|go to work|go to bed|at home|at work|by bus|by car|by train|by plane|by bike|to school|to work|in bed|at night|on foot|at lunch)/i.test(ctx)) continue;
       addIssue(issues, { ruleId:'ART-002', category:'article', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'单数可数名词 "' + t.raw + '" 前需要冠词(a/an/the)或限定词', suggestion:'the/a ' + t.raw });
     }
     // ART-004 抽象固定搭配误用 the（中）
@@ -144,6 +165,7 @@
       var nm = tokens[p + 1];
       if (!isProperNoun(nm)) continue;
       if (COUNTRY_OK[nm.text]) continue;
+      if (PHYS_S.test(nm.text) || UNCOUNTABLE[nm.text]) continue; // news/physics 等常见专有误标放行
       addIssue(issues, { ruleId:'ART-006', category:'article', confidence:'high', start:tokens[p].start, end:nm.end, errorText:text.slice(tokens[p].start, nm.end), message:'人名/单个国家名称前不加 the，应直接写 "' + nm.raw + '"', suggestion:nm.raw });
     }
     // ART-007 序数词缺 the（中）
@@ -163,20 +185,30 @@
     var futureAdv = /\btomorrow\b/.test(text) || /\bnext\s+(week|month|year|monday|tuesday|day|weekend)\b/.test(text) || /\bin the future\b/.test(text);
     var nowAdv = /\bnow\b/.test(text);
     var canary = /\bsaid\b/.test(text) && /\bfound\b/.test(text) || /\bthe\s+earth\s+goes\b/i.test(text);
+    var sinceMatch = /\bsince\b\s+((19|20)\d{2}|(last|later|childhood|then)\b)/i.exec(text) && !/since\s+then\b/i.test(text);
 
     if (pastAdv) {
       // TEN-002 现在完成 + 明确过去点
-      var mm = /\b(have|has)\s+(\w{3,}(ed|[a-z]en))\b/i.exec(text);
-      if (mm) addIssue(issues, { ruleId:'TEN-002', category:'tense', confidence:'high', start:mm.index, end:mm.index+mm[0].length, errorText:mm[0], message:'现在完成时(has/have done)不能搭配明确过去时间点，请改用一般过去式', suggestion:'改为一般过去式' });
+      var havePP = false;
+      for (var h2 = 0; h2 < n; h2++) {
+        if (tokens[h2].text !== 'have' && tokens[h2].text !== 'has') continue;
+        var pr = tok(tokens, h2 + 1);
+        if (!pr) continue;
+        if (hasAnyTag(pr, ['PastPart', 'PastTense']) || IRREG_PP[pr.text]) {
+          havePP = true;
+          addIssue(issues, { ruleId:'TEN-002', category:'tense', confidence:'high', start:tokens[h2].start, end:pr.end, errorText:text.slice(tokens[h2].start, pr.end), message:'现在完成时(has/have done)不能搭配明确过去时间点，请改用一般过去式', suggestion:'改为一般过去式' });
+          break;
+        }
+      }
       // TEN-001 过去时间状语 + 一般现在时谓语
-      if (!canary && !mm) {
+      if (!canary && !havePP && !sinceMatch) {
         for (var i = 0; i < n; i++) {
           var t = tokens[i];
+          if (MODALS[t.text]) continue;
           if (!hasAnyTag(t, ['Verb','Infinitive'])) continue;
-          if (hasTag(t, 'PastTense') || hasTag(t, 'FutureTense') || hasTag(t, 'PastPart')) continue;
-          if (hasTag(t, 'Gerund')) continue;
+          if (hasTag(t, 'PastTense') || hasTag(t, 'FutureTense') || hasTag(t, 'PastPart') || hasTag(t, 'Gerund')) continue;
           if (/^(am|is|are|was|were|have|has|had|do|does|did|will|would|can|could|may|might|must|shall|should)$/i.test(t.text)) continue;
-          if (subjectBefore(tokens, i) === null) continue;
+          if (verbBlocked(tokens, i)) continue;
           addIssue(issues, { ruleId:'TEN-001', category:'tense', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'句中有过去时间状语(yesterday/last week)，谓语应使用一般过去式', suggestion:t.raw + ' → 过去式' });
           break;
         }
@@ -186,14 +218,14 @@
       for (var f = 0; f < n; f++) {
         var tf = tokens[f];
         if (!hasTag(tf, 'PastTense')) continue;
-        if (subjectBefore(tokens, f) === null) continue;
+        if (verbBlocked(tokens, f)) continue;
         addIssue(issues, { ruleId:'TEN-005', category:'tense', confidence:'high', start:tf.start, end:tf.end, errorText:tf.raw, message:'tomorrow/next week 是将来时间，谓语不能使用过去式', suggestion:'will ' + tf.raw });
         break;
       }
     }
     // TEN-003 since + 过去时间，主句现在时（中）
-    var sm = /\bsince\b\s+((19|20)\d{2}|(last|later|childhood|then)\b)/i.exec(text);
-    if (sm && !/since\s+then\b/i.test(text)) {
+    if (sinceMatch) {
+      var sm = sinceMatch;
       for (var s2 = 0; s2 < n; s2++) {
         if (tokens[s2].start <= sm.index) continue;
         if (hasAnyTag(tokens[s2], ['Verb','Infinitive']) && !hasTag(tokens[s2],'PastTense') && !/(am|is|are|was|were)$/i.test(tokens[s2].text)) {
@@ -203,13 +235,20 @@
       }
     }
     // TEN-004 并列时态跳跃（中）
-    for (var e = 2; e < n - 1; e++) {
+    for (var e = 1; e < n - 1; e++) {
       if (tokens[e].text !== 'and' && tokens[e].text !== 'but') continue;
-      var lv = tok(tokens, e - 1), rv = tok(tokens, e + 1);
-      if (!lv || !rv) continue;
-      if (hasTag(lv, 'PastTense') && hasAnyTag(rv, ['Verb','Infinitive']) && !hasTag(rv, 'PastTense')) {
-        addIssue(issues, { ruleId:'TEN-004', category:'tense', confidence:'mid', start:rv.start, end:rv.end, errorText:rv.raw, message:'并列句连续动作无时间切换，前后时态建议保持一致（前句用过去式）', suggestion:rv.raw + ' → 过去式' });
+      var rv = null;
+      for (var qr = e + 1; qr < Math.min(e + 4, n); qr++) {
+        if (/^(he|she|it|they|we|i|you)$/.test(tokens[qr].text) || tokens[qr].text === ',') break;
+        if (hasTag(tokens[qr], 'PresentTense')) { rv = tokens[qr]; break; }
       }
+      if (!rv) continue;
+      var lv = null;
+      for (var w3 = e - 1; w3 >= Math.max(0, e - 4); w3--) {
+        if (tokens[w3].text === ',' || /^(he|she|it|they|we|i|you)$/.test(tokens[w3].text)) break;
+        if (hasTag(tokens[w3], 'PastTense')) { lv = tokens[w3]; break; }
+      }
+      if (lv && rv) addIssue(issues, { ruleId:'TEN-004', category:'tense', confidence:'mid', start:rv.start, end:rv.end, errorText:rv.raw, message:'并列句连续动作无时间切换，前后时态建议保持一致（前句用过去式）', suggestion:rv.raw + ' → 过去式' });
     }
     // TEN-006 now + 一般现在时（低，仅建议）
     if (nowAdv) {
@@ -273,6 +312,7 @@
     // SVA-001/002 一般现在时主谓一致
     for (var v = 0; v < n; v++) {
       var tv = tokens[v];
+      if (MODALS[tv.text]) continue;
       if (!hasTag(tv, 'PresentTense') && !hasTag(tv, 'Verb')) continue;
       if (hasTag(tv, 'PastTense') || hasTag(tv, 'Gerund')) continue;
       var sb = subjectBefore(tokens, v);
