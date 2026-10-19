@@ -1,0 +1,209 @@
+body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        .profile-major,.profile-class,.profile-name{
+            display: inline;
+            margin-right:12px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .control-panel {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            margin-bottom: 25px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        select, button {
+            padding: 10px 16px;
+            font-size: 15px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+        }
+        button:hover { background-color: #2980b9; }
+        button.secondary { background-color: #2ecc71; }
+        button.secondary:hover { background-color: #27ae60; }
+        button.warning { background-color: #e67e22; }
+        button.warning:hover { background-color: #d35400; }
+        button.outline { background-color: transparent; color: #475569; border: 1px solid #cbd5e1; }
+        button.outline:hover { background-color: #f1f5f9; }
+        
+        .timer-box {
+            font-family: monospace;
+            font-size: 18px;
+            font-weight: bold;
+            color: #e74c3c;
+            background: #fdf2f2;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid #fecaca;
+        }
+        #timerDisplay {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .card {
+            border: 1px solid #e1e8ed;
+            border-radius: 8px;
+            padding: 25px;
+            background: #fafbfc;
+            display: none;
+        }
+        .card.active { display: block; }
+        
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+        }
+        .question-title {
+            font-size: 20px;
+            color: #2c3e50;
+            margin: 0;
+        }
+        .directions {
+            background: #eef2f5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        
+        textarea {
+            width: 100%;
+            height: 160px;
+            padding: 12px;
+            box-sizing: border-box;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            line-height: 1.5;
+        }
+        textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+        }
+        .action-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .word-count {
+            font-size: 14px;
+            font-weight: bold;
+            color: #64748b;
+        }
+        
+        .answer-section {
+            margin-top: 25px;
+            border-top: 2px dashed #cbd5e1;
+            padding-top: 20px;
+            display: none;
+        }
+        .answer-section.show { display: block; }
+        .ans-title {
+            font-weight: bold;
+            color: #e67e22;
+            margin-bottom: 8px;
+            margin-top: 15px;
+        }
+        .abstract-text, .keywords {
+            line-height: 1.6;
+            background: #fff;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        .keywords { font-style: italic; color: #555; }
+
+        /* 评分模块 */
+        button.score { background-color: #8e44ad; }
+        button.score:hover { background-color: #703688; }
+        .score-panel { display: none; margin-top: 15px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #fff; }
+        .score-panel.show { display: block; }
+        .score-total { font-size: 24px; font-weight: bold; text-align: center; }
+        .score-grade { text-align: center; font-size: 13px; color: #64748b; margin-bottom: 12px; }
+        .score-row { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; font-size: 13px; }
+        .score-label { width: 120px; flex-shrink: 0; color: #475569; }
+        .score-bar { flex: 1; height: 10px; background: #f1f5f9; border-radius: 5px; overflow: hidden; }
+        .score-fill { height: 100%; border-radius: 5px; transition: width .4s; }
+        .score-val { width: 36px; text-align: right; font-weight: bold; }
+        .score-tip { font-size: 12px; color: #94a3b8; margin: 0 0 8px 130px; }
+        .score-issues { margin: 10px 0 0; padding-left: 20px; font-size: 13px; }
+        .score-issues li { margin-bottom: 4px; line-height: 1.5; }
+        .score-issues .err { color: #c0392b; }
+        .score-issues .warnx { color: #d35400; }
+        .score-missed { color: #c0392b; }
+        .score-empty { color: #64748b; text-align: center; }
+        @media (max-width: 640px) {
+            .score-label { width: 88px; font-size: 12px; }
+            .score-tip { margin-left: 98px; }
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 640px) {
+            body { padding: 8px; }
+            .container { padding: 15px; border-radius: 10px; }
+            h1 { font-size: 22px; }
+            .subtitle { font-size: 12px; }
+            .control-panel { flex-direction: column; align-items: stretch; }
+            .btn-group { flex-wrap: wrap; }
+            .btn-group button { flex: 1 1 40%; }
+            select { width: 100%; }
+            select, button, textarea { font-size: 16px; }
+            .timer-box { display: flex; justify-content: space-between; align-items: center; }
+            .card { padding: 15px; }
+            .question-title { font-size: 18px; }
+            .directions { font-size: 13px; padding: 12px; }
+            .action-row { flex-direction: column; align-items: stretch; gap: 8px; }
+            .word-count { text-align: center; }
+        }
