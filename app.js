@@ -266,8 +266,6 @@ const PROFILE_CONFIG =Object.freeze({
         document.getElementById('answerBox').classList.toggle('show');
     }
 
-    // ===================== 评分模块（纯前端启发式） =====================
-    // 总分 100：内容覆盖 30 + 语法正确性 25 + 表达贴近度 25 + 词数 20
 
     const STOPWORDS = new Set(("the a an and or but of to in on for with at by from as is are was were be been being have has had do does did we our this that these those it its they their he she you your his her not no than then so such more most other into over under between about through during before after up down out off again once here there when where why how all any both each few some own same only very can will just should now also may might must would could which who whom whose what if because while although however therefore thus via per vs etc").split(" "));
 
@@ -284,7 +282,7 @@ const PROFILE_CONFIG =Object.freeze({
         return words.some(w => AUX_RE.test(w) || COMMON_VERBS.has(w) || VERB_CLUE.test(w));
     }
 
-    // 语法检查：返回问题列表 {level: 扣分值, msg}
+
     function checkGrammarIssues(text){
         const issues = [];
 
@@ -312,12 +310,11 @@ const PROFILE_CONFIG =Object.freeze({
             if (art === 'an' && !vowelSound) issues.push({level:2, msg:`冠词误用："an ${m[2]}" 应为 "a ${m[2]}"`});
         }
 
-        // 逐句检查
         const raw = text.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) || [];
         const sentences = raw.map(s=>s.trim()).filter(s=>s.length>0);
         if (sentences.length < 4) issues.push({level:1, msg:`句子数量偏少（${sentences.length} 句），摘要一般为 4~8 句`});
         sentences.forEach((s, i)=>{
-            if (/^[\d\s'"()\]]+$/.test(s)) return;              // 跳过纯数字碎片（如 1.5 被拆开后的 "1."）
+            if (/^[\d\s'"()\]]+$/.test(s)) return;           
             const label = `第 ${i+1} 句`;
             if (/^[a-z]/.test(s)) issues.push({level:3, msg:`${label}句首字母未大写："${s.slice(0,24)}…"`});
             if (!/[.!?]["')\]]*$/.test(s)) issues.push({level:2, msg:`${label}结尾缺少句点`});
@@ -330,7 +327,7 @@ const PROFILE_CONFIG =Object.freeze({
         return issues;
     }
 
-    // 关键词命中（容忍单复数/时态变形、连字符）
+ 
     function keywordHit(text, kw){
         const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const parts = kw.trim().toLowerCase().split(/\s+/).map(esc);
@@ -338,7 +335,7 @@ const PROFILE_CONFIG =Object.freeze({
         return new RegExp("\\b" + parts.join("[\\s\\-]+") + "\\b").test(text.toLowerCase());
     }
 
-    // 提取内容词（去停用词）
+  
     function contentWordSet(text){
         const set = new Set();
         (text.toLowerCase().match(/[a-z][a-z'-]{2,}/g) || []).forEach(w=>{ if(!STOPWORDS.has(w)) set.add(w); });
@@ -370,11 +367,11 @@ const PROFILE_CONFIG =Object.freeze({
         const missed = kws.filter(k => !keywordHit(text, k));
         const kwScore = kws.length ? Math.round((kws.length - missed.length) / kws.length * 30) : 30;
 
-        // 2. 语法正确性（25 分）
+        
         const issues = checkGrammarIssues(text);
         const grScore = Math.max(0, 25 - issues.reduce((a,i)=>a+i.level, 0));
 
-        // 3. 表达贴近度（25 分）：与参考答案内容词重合率，50% 重合即满分
+       
         const refWords = contentWordSet(q.abstract);
         const userWords = contentWordSet(text);
         let hit = 0;
@@ -382,7 +379,7 @@ const PROFILE_CONFIG =Object.freeze({
         const recall = refWords.size ? hit / refWords.size : 0;
         const simScore = Math.min(25, Math.round(recall / 0.5 * 25));
 
-        // 4. 词数（20 分）
+      
         const wc = text.split(/\s+/).length;
         let wcScore, wcMsg;
         if (wc >= 120 && wc <= 150)              { wcScore = 20; wcMsg = '词数达标'; }
@@ -422,21 +419,20 @@ const PROFILE_CONFIG =Object.freeze({
     }
 
    
-    // 计时器逻辑：点击计时器开始/暂停，重置按钮恢复满时并停止
     function resetTimer() {
         clearInterval(timerInterval);
         timerInterval = null;
-        timeLeft = 15 * 60;
+        timeLeft = 20 * 60;
         updateTimerDisplay();
     }
 
     function toggleTimer() {
-        if (timerInterval) {           // 正在计时 → 暂停
+        if (timerInterval) {          
             clearInterval(timerInterval);
             timerInterval = null;
             return;
         }
-        if (timeLeft <= 0) return;     // 时间已到，需先重置
+        if (timeLeft <= 0) return;    
         timerInterval = setInterval(() => {
             if (timeLeft > 0) {
                 timeLeft--;
