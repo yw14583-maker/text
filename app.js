@@ -1,202 +1,8 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>期末英语摘要写作 - 随机抽题与模拟答题系统</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #f4f6f9;
-            color: #040d0e;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-        }
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-            margin-bottom: 5px;
-        }
-        .subtitle {
-            text-align: center;
-            color: #7f8c8d;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        .btn-box {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            margin-bottom: 30px;
-        }
-        button {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            font-size: 16px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:hover {
-            background-color: #2980b9;
-        }
-        button.secondary {
-            background-color: #2ecc71;
-        }
-        button.secondary:hover {
-            background-color: #27ae60;
-        }
-        button.warning {
-            background-color: #e67e22;
-        }
-        button.warning:hover {
-            background-color: #d35400;
-        }
-        .card {
-            border: 1px solid #e1e8ed;
-            border-radius: 8px;
-            padding: 25px;
-            background: #fafbfc;
-            display: none;
-        }
-        .card.active {
-            display: block;
-        }
-        .question-title {
-            font-size: 20px;
-            color: #2c3e50;
-            margin-top: 0;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 8px;
-        }
-        .directions {
-            background: #eef2f5;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-family: monospace;
-            white-space: pre-wrap;
-            line-height: 1.5;
-            font-size: 14px;
-        }
-        .section-title {
-            font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 8px;
-            margin-top: 20px;
-        }
-       
-        .writing-area {
-            margin-top: 20px;
-        }
-        textarea {
-            width: 100%;
-            height: 160px;
-            padding: 12px;
-            box-sizing: border-box;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            font-size: 15px;
-            font-family: inherit;
-            resize: vertical;
-            line-height: 1.5;
-        }
-        textarea:focus {
-            outline: none;
-            border-color: #3498db;
-            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
-        }
-        .word-count {
-            text-align: right;
-            font-size: 13px;
-            color: #64748b;
-            margin-top: 5px;
-        }
-        .action-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
-        }
-        .answer-section {
-            margin-top: 25px;
-            border-top: 2px dashed #cbd5e1;
-            padding-top: 20px;
-            display: none;
-        }
-        .answer-section.show {
-            display: block;
-        }
-        .ans-title {
-            color: #e67e22;
-        }
-        .abstract-text {
-            line-height: 1.6;
-            margin-bottom: 15px;
-            text-align: justify;
-            background: #fff;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #e2e8f0;
-        }
-        .keywords {
-            font-style: italic;
-            color: #555;
-            background: #fff;
-            padding: 10px 15px;
-            border-radius: 6px;
-            border: 1px solid #e2e8f0;
-        }
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>英文摘要写作模拟系统</h1>
-    <div class="subtitle">2026-2027第一学期期末考试题库</div>
-
-    <div class="btn-box">
-        <button onclick="drawRandomQuestion()">🎲 随机抽取一题</button>
-    </div>
-
-    <div id="questionCard" class="card">
-        <h2 id="qTitle" class="question-title"></h2>
-        <div id="qDirections" class="directions"></div>
-        
-        <div class="writing-area">
-            <div class="section-title">请在此处输入您的英文摘要 (建议 120-150 词)：</div>
-            <textarea id="userAnswer" placeholder="Type your English abstract here..." oninput="updateWordCount()"></textarea>
-            <div class="action-row">
-                <span class="word-count" id="wordCountDisplay">单词数: 0 词</span>
-                <div>
-                    <button class="warning" onclick="clearAnswer()">清空输入</button>
-                    <button class="secondary" onclick="toggleAnswer()">📖 显示/隐藏参考答案</button>
-                </div>
-            </div>
-        </div>
-
-       
-        <div id="answerBox" class="answer-section">
-            <div class="section-title ans-title">Reference Answer (参考答案):</div>
-            <div id="qAbstract" class="abstract-text"></div>
-            <div class="section-title ans-title">Keywords (关键词):</div>
-            <div id="qKeywords" class="keywords"></div>
-        </div>
-    </div>
-</div>
-
-<script>
+const PROFILE_CONFIG =Object.freeze({
+        major:"工业设计",
+        className: "25-1",
+        name: "吴嘉俊"
+    });
     const questions = [
         {
             id: 1,
@@ -257,7 +63,7 @@
         {
             id: 9,
             title: "9: 牛磺酸缺乏与衰老",
-            directions: "Writing\nDirections: Write an English abstract of 120 to 150 words for a research article on Taurine deficiency as a driver of aging, based on the Chinese outline below. Cover all the points in your own words.\n背景：衰老与循环血液中多种分子(molecule)水平的变化有关，但其中一些变化的具体分子身份或生物学意义尚不明确。\n目的：探究牛磺酸(taurine)浓度下降是否为衰老的驱动因素。\n方法：首先在小鼠、猴子和人类中检测牛磺酸浓度随年龄的变化；随后对中年小鼠进行牛磺酸补充，评估其骨骼、肌肉、大脑、免疫等多项健康指标，并在人类中分析牛磺酸水平与疾病及运动的关系。\n结果：牛磺酸(taurine)浓度随年龄增长而下降；补充牛磺酸后，充牛磺酸可延长小鼠的健康寿命和预期寿命，猴子也获得健康收益，中年小鼠多项身体机能明显改善；人类中牛磺酸水平越低，患年龄相关疾病越多，耐力运动后浓度则会升高。\n结论：牛磺酸(taurine)缺乏可能是衰老的一个驱动因素，但要证实它是否同样导致人类衰老，还需开展长期、严格对照的人体补充试验。",
+            directions: "Writing\nDirections: Write an English abstract of 120 to 150 words for a research article on Taurine deficiency as a driver of aging, based on the Chinese outline below. Cover all the points in your own words.\n背景：衰老与循环血液中多种分子(molecule)水平的变化有关，但其中一些变化的具体分子身份或生物学意义尚不明确。\n目的：探究牛磺酸(taurine)浓度下降是否为衰老的驱动因素。\n方法：首先在小鼠、猴子和人类中检测牛磺酸浓度随年龄的变化；随后对中年小鼠进行牛磺酸补充，评估其骨骼、肌肉、大脑、免疫等多项健康指标，并在人类中分析牛磺酸水平与疾病及运动的关系。\n结果：牛磺酸(taurine)浓度随年龄增长而下降；补充牛磺酸可延长小鼠的健康寿命和预期寿命，猴子也获得健康收益，中年小鼠多项身体机能明显改善；人类中牛磺酸水平越低，患年龄相关疾病越多，耐力运动后浓度则会升高。\n结论：牛磺酸(taurine)缺乏可能是衰老的一个驱动因素，但要证实它是否同样导致人类衰老，还需开展长期、严格对照的人体补充试验。",
             abstract: "Aging is associated with changes in circulating levels of various molecules, some of which remain undefined. We find that concentrations of circulating taurine decline with aging in mice, monkeys, and humans. A reversal of this decline through taurine supplementation increased the health span and life span in mice and health span in monkeys. We, therefore, investigated the health of taurine-fed middle-aged mice and found an improved functioning of bone, muscle, brain, fat and immune system, indicating an overall improvement in health. In humans, lower taurine concentrations correlated with several age-related diseases and taurine concentrations increased after acute endurance exercise. Thus, taurine deficiency may be a driver of aging because its reversal increases health span in worms, rodents, and primates and life span in worms and rodents. To test whether taurine deficiency is a driver of aging in humans as well, long-term, well-controlled taurine supplementation trials are needed.",
             keywords: "taurine, aging, health span, life span, age-related diseases"
         },
@@ -340,30 +146,350 @@
         }
     ];
 
-    let currentQuestion = null;
+    // 各篇参考范文中的固定搭配（英文｜中文释义），按题目 id 绑定
+    const QUESTION_COLLOCATIONS = {
+        1: [
+            "make great progress in｜在……方面取得巨大进展",
+            "as ... as｜和……一样",
+            "depend on｜依赖，取决于",
+            "adapt to｜适应",
+            "switch between ... and ...｜在……与……之间切换",
+            "move through｜穿过，穿越",
+            "in terms of｜就……而言",
+            "perform better than｜表现优于",
+            "respond to｜应对，回应",
+            "be useful for｜对……有用",
+            "such as｜例如"
+        ],
+        2: [
+            "a significant part of｜……的重要组成部分",
+            "draw attention to｜引起对……的关注",
+            "in order to｜为了",
+            "be conducted among｜在……中开展",
+            "attitudes toward｜对……的态度",
+            "awareness of｜对……的意识",
+            "form a (good) habit｜养成（良好）习惯",
+            "the reason for｜……的原因",
+            "lack of｜缺乏",
+            "knowledge of｜关于……的知识",
+            "regulation on｜关于……的法规"
+        ],
+        3: [
+            "be important for｜对……重要",
+            "be associated with｜与……相关联",
+            "compared with｜与……相比",
+            "wake up｜醒来，起床",
+            "be (negatively) correlated with｜与……呈（负）相关",
+            "the number of｜……的数量",
+            "associations between ... and ...｜……与……之间的关联",
+            "academic performance｜学业表现",
+            "learning outcomes｜学习成果"
+        ],
+        4: [
+            "be expected to｜预计会",
+            "cause changes to｜对……造成变化",
+            "an assessment of｜对……的评估",
+            "contribute to｜导致；有助于",
+            "in line with｜与……一致",
+            "be critical for｜对……至关重要",
+            "face threats｜面临威胁",
+            "more than｜超过",
+            "a proportion of｜……的比例"
+        ],
+        5: [
+            "trigger a crisis｜引发危机",
+            "be implemented in｜在……（时间）实施",
+            "the effectiveness of｜……的有效性",
+            "before and after｜……之前与之后",
+            "improvements in｜在……方面的改善",
+            "the recovery of｜……的恢复",
+            "be key to｜是……的关键",
+            "in addition to｜除……之外（还）",
+            "bring hope for｜为……带来希望"
+        ],
+        6: [
+            "rely on｜依赖，依靠",
+            "lack ... analysis｜缺乏……分析",
+            "based on｜基于",
+            "a trend from ... to ...｜从……到……的趋势",
+            "among children and adolescents｜在儿童和青少年中",
+            "continue to rise｜持续上升",
+            "remain high｜保持高位",
+            "be driven by｜由……驱动",
+            "be related to｜与……相关",
+            "be essential for｜对……必不可少"
+        ],
+        7: [
+            "be informed by｜受……启发；依据",
+            "engagement with｜与……的互动",
+            "along with｜连同，以及",
+            "reflect on｜反思，回想",
+            "of one's choice｜自选的",
+            "the severity of｜……的严重程度",
+            "the influence of｜……的影响",
+            "pathways to｜通往……的途径",
+            "implications for｜对……的启示",
+            "be stronger in ... group｜在……群体中更明显"
+        ],
+        8: [
+            "be fundamental for｜对……至关重要",
+            "the factors that shape｜塑造……的因素",
+            "the onset of｜……的开始",
+            "the number of｜……的数量",
+            "begin with｜始于，从……开始",
+            "along with｜连同，随着",
+            "play a role in｜在……中起作用",
+            "greater ... than｜比……更大",
+            "the loss of｜……的丧失",
+            "previously thought｜此前认为的"
+        ],
+        9: [
+            "be associated with｜与……相关",
+            "changes in｜在……方面的变化",
+            "decline with｜随……下降",
+            "an improvement in｜在……方面的改善",
+            "correlate with｜与……相关",
+            "a driver of｜……的驱动因素",
+            "as well｜也，同样",
+            "long-term trials｜长期试验",
+            "well-controlled trials｜严格对照的试验"
+        ],
+        10: [
+            "be in a relationship with｜与……有关系",
+            "relate to｜与……相关",
+            "offer opportunities for｜为……提供机会",
+            "one's perspective on｜对……的观点",
+            "arrive at｜到达；得出",
+            "a wave of｜一波……",
+            "principles that help｜有助于……的原则",
+            "an aesthetic compass for｜……的美学指南"
+        ],
+        11: [
+            "demand for｜对……的需求",
+            "seek to｜力图，设法",
+            "attract visitors｜吸引游客",
+            "to and from｜往返",
+            "lack of｜缺乏",
+            "a full understanding of｜对……的充分理解",
+            "take a ... approach｜采取……的方法",
+            "a list of｜一份……清单",
+            "differences in｜在……方面的差异",
+            "recommendations for｜对……的建议"
+        ],
+        12: [
+            "in the context of｜在……背景下",
+            "the need for｜对……的需求",
+            "contribute to｜有助于",
+            "the acceptance of｜对……的接受",
+            "be validated using｜用……验证",
+            "collected from｜从……收集",
+            "... and above｜……及以上",
+            "the intention to use｜使用……的意愿",
+            "implications for｜对……的启示",
+            "the use of｜……的使用"
+        ],
+        13: [
+            "be used in｜用于",
+            "impact ... negatively｜对……产生负面影响",
+            "attitudes toward｜对……的态度",
+            "be important for｜对……重要",
+            "to what extent｜在多大程度上",
+            "be conducted in｜在……开展",
+            "an academic background of｜……的学术背景",
+            "a difference between｜……之间的差异",
+            "the acceptance of｜对……的接受",
+            "a factor affecting｜影响……的因素",
+            "willingness to purchase｜购买意愿"
+        ],
+        14: [
+            "the popularity of｜……的流行",
+            "draw attention to｜引起对……的关注",
+            "in relation to｜关于；与……相关",
+            "arrange a focus group｜组织焦点小组",
+            "conduct an experiment｜开展实验",
+            "function as｜起……作用",
+            "be used as｜被用作",
+            "assist in｜协助做……",
+            "a first step in｜……的第一步",
+            "insights into｜对……的洞见",
+            "implications for｜对……的启示",
+            "as well as｜以及"
+        ],
+        15: [
+            "more of A than B｜与其说是B不如说是A",
+            "be found in｜存在于",
+            "a cause for concern｜值得担忧的事",
+            "the origins of｜……的起源",
+            "based on｜基于",
+            "be responsible for｜导致；对……负责",
+            "a vicious cycle of｜……的恶性循环",
+            "a range of｜一系列",
+            "reflect on｜反思",
+            "if need be｜如有必要",
+            "in order to｜为了",
+            "maintain a healthy life｜保持健康生活"
+        ],
+        16: [
+            "the purpose of｜……的目的",
+            "the status of｜……的现状",
+            "the improvement of｜……的改善",
+            "be conducted to｜面向……开展",
+            "differences in｜在……方面的差异",
+            "according to｜根据",
+            "the absence or presence of｜……的有无",
+            "in terms of｜就……而言",
+            "depend on｜取决于",
+            "call for｜呼吁，要求",
+            "in order to｜为了",
+            "it is necessary to｜有必要"
+        ],
+        17: [
+            "attitudes towards｜对……的态度",
+            "a sample of｜……的样本",
+            "be negative about｜对……持负面态度",
+            "a level of education｜教育水平",
+            "a majority of｜大多数",
+            "doubts about｜对……的怀疑",
+            "perceive ... as｜把……视为",
+            "persuade sb to do｜说服某人做",
+            "be better for｜对……更好",
+            "willingness to purchase｜购买意愿"
+        ],
+        18: [
+            "among the most ...｜最……之一",
+            "a challenge of｜……的挑战",
+            "a tool for｜用于……的工具",
+            "owing to｜由于",
+            "evidence of｜……的证据",
+            "data on｜关于……的数据",
+            "an estimated ... in damages｜估计……的损失",
+            "the value of｜……的价值",
+            "offer guidance for｜为……提供指导",
+            "maximize effectiveness｜最大化效力"
+        ],
+        19: [
+            "a threat to｜对……的威胁",
+            "be inferred from｜从……推断",
+            "per country｜每个国家",
+            "more than twice as many ... as｜是……的两倍多",
+            "the main drivers of｜……的主要驱动因素",
+            "economic growth｜经济增长",
+            "be particularly vulnerable｜尤其脆弱",
+            "failure to do｜未能做……",
+            "recognize ... as｜承认……为",
+            "divert attention away from｜将注意力从……转移"
+        ],
+        20: [
+            "be introduced as｜被引入作为",
+            "the gold standard for｜……的金标准",
+            "the evaluation of｜对……的评估",
+            "ever since｜自此以来",
+            "a baseline of｜……的基线",
+            "in randomly selected patients｜在随机选取的患者中",
+            "outperform｜优于，胜过",
+            "improvement from｜相较……的改善",
+            "the (urgent) need for｜对……的（迫切）需要",
+            "clinical decision support｜临床决策支持"
+        ]
+    };
+
+    let currentIndex = -1;
+    let timerInterval = null;
+    let timeLeft = 20 * 60; 
+
+    const STORAGE_KEY = "englishAbstractAnswers_v1";
+
+    let savedAnswers ={};
+
+    try {savedAnswers = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+
+    }
+    catch(e){
+        savedAnswers ={};
+    }
+
+    
+    window.onload = function() {
+        const select = document.getElementById('questionSelect');
+        questions.forEach((q, index) => {
+            const opt = document.createElement('option');
+            opt.value = index;
+            opt.innerText = q.title;
+            select.appendChild(opt);
+        });
+        drawRandomQuestion();
+    };
+    
+    function renderProfile(){
+        document.querySelector(".profile-major").textContent = PROFILE_CONFIG.major;
+        document.querySelector(".profile-class").textContent = PROFILE_CONFIG.className;
+        document.querySelector(".profile-name").textContent = PROFILE_CONFIG.name;
+    }
+    
+    document.addEventListener("DOMContentLoaded",renderProfile);
+
+    function saveCurrentAnswer(){
+        if (currentIndex <0)return;
+
+        const answer = document.getElementById("userAnswer").value;
+        const questionId = questions[currentIndex].id;
+
+        savedAnswers[questionId]=answer;
+        
+        try{localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(savedAnswers)
+        );
+        }catch(e){
+            console.error("defeat",e)
+        }
+
+    }
+    function displayQuestion(index) {
+        currentIndex = index;
+        const q = questions[currentIndex];
+
+        document.getElementById('qTitle').innerText = q.title;
+        document.getElementById('qDirections').innerText = q.directions;
+        document.getElementById('qAbstract').innerText = q.abstract;
+        document.getElementById('qKeywords').innerText = q.keywords;
+
+        document.getElementById('userAnswer').value =savedAnswers[q.id]|| '';
+        
+        updateWordCount();
+        document.getElementById('answerBox').classList.remove('show');
+        document.getElementById('scorePanel').classList.remove('show');
+        document.getElementById('questionCard').classList.add('active');
+        document.getElementById('questionSelect').value = index;
+
+        resetTimer();
+    }
 
     function drawRandomQuestion() {
         const randomIndex = Math.floor(Math.random() * questions.length);
-        currentQuestion = questions[randomIndex];
+        displayQuestion(randomIndex);
+    }
 
-        // 渲染到页面
-        document.getElementById('qTitle').innerText = currentQuestion.title;
-        document.getElementById('qDirections').innerText = currentQuestion.directions;
-        document.getElementById('qAbstract').innerText = currentQuestion.abstract;
-        document.getElementById('qKeywords').innerText = currentQuestion.keywords;
+    function prevQuestion() {
+        let index = currentIndex - 1;
+        if (index < 0) index = questions.length - 1;
+        displayQuestion(index);
+    }
 
-        // 清空输入框和答案折叠状态
-        document.getElementById('userAnswer').value = '';
-        updateWordCount();
-        document.getElementById('answerBox').classList.remove('show');
-        
-       
-        document.getElementById('questionCard').classList.add('active');
+    function nextQuestion() {
+        let index = currentIndex + 1;
+        if (index >= questions.length) index = 0;
+        displayQuestion(index);
+    }
+
+    function selectQuestion(val) {
+        if (val !== "") {
+            displayQuestion(parseInt(val));
+        }
     }
 
     function updateWordCount() {
         const text = document.getElementById('userAnswer').value.trim();
-        // 简单按空格分词统计英文单词数
         const words = text === '' ? [] : text.split(/\s+/);
         const count = words.length;
         
@@ -371,22 +497,329 @@
         display.innerText = `单词数: ${count} 词`;
         
         if (count >= 120 && count <= 150) {
-            display.style.color = '#27ae60'; // 符合要求显示绿色
+            display.style.color = '#27ae60';
         } else {
-            display.style.color = '#e67e22'; // 提醒偏多或偏少显示橙色
+            display.style.color = '#e67e22';
         }
     }
 
     function clearAnswer() {
         document.getElementById('userAnswer').value = '';
+        saveCurrentAnswer();
         updateWordCount();
     }
 
     function toggleAnswer() {
-        const answerBox = document.getElementById('answerBox');
-        answerBox.classList.toggle('show');
+        document.getElementById('answerBox').classList.toggle('show');
     }
-</script>
 
-</body>
-</html>
+
+    const STOPWORDS = new Set(("the a an and or but of to in on for with at by from as is are was were be been being have has had do does did we our this that these those it its they their he she you your his her not no than then so such more most other into over under between about through during before after up down out off again once here there when where why how all any both each few some own same only very can will just should now also may might must would could which who whom whose what if because while although however therefore thus via per vs etc").split(" "));
+
+    const COMMON_VERBS = new Set(("go goes went come came make made take took get got give gave show showed find found use used develop developed test tested study studied analyze analyzed examine examined investigate investigated report reported suggest suggested indicate indicated reveal revealed demonstrate demonstrated present presented propose proposed describe described provide provided include included increase increased decrease decreased reduce reduced improve improved affect affected influence influenced cause caused lead led result resulted remain remained appear appeared seem seemed become became help helped allow allowed enable enabled perform performed conduct conducted collect collected compare compared assess assessed evaluate evaluated measure measured observe observed identify identified determine determined explore explored exist existed change changed grow grew decline declined rise rose fall fell reach reached exceed exceeded threaten threatened halt halted recover recovered support supported reflect reflected").split(" "));
+
+    const VERB_CLUE = /(s|es|ed|d|ing)$/;
+    const AUX_RE = /^(is|are|was|were|be|been|being|has|have|had|do|does|did|will|would|can|could|may|might|must|shall|should)$/;
+
+    function escapeHtml(s){
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function hasVerb(words){
+        return words.some(w => AUX_RE.test(w) || COMMON_VERBS.has(w) || VERB_CLUE.test(w));
+    }
+
+
+    function checkGrammarIssues(text){
+        const issues = [];
+
+        const cjkCount = (text.match(/[一-鿿]/g) || []).length;
+        if (cjkCount > 0) {
+            issues.push({level:25, msg:`检测到 ${cjkCount} 个汉字，摘要必须用英文撰写，语法项不得分`});
+            return issues;
+        }
+
+        const zhPunc = text.match(/[，。；：！？（）【】“”‘’]/g);
+        if (zhPunc) issues.push({level:3, msg:`使用了中文标点（${[...new Set(zhPunc)].join(' ')}），英文写作请用半角标点`});
+
+        if (/[a-zA-Z],[a-zA-Z]/.test(text)) issues.push({level:2, msg:'存在逗号后缺少空格的情况（如 "May,2015"）'});
+
+        const rep = text.match(/\b([A-Za-z]+)\s+\1\b/gi);
+        if (rep) issues.push({level:3, msg:`疑似重复单词：${[...new Set(rep.map(s=>s.toLowerCase()))].join(', ')}`});
+
+        if (/\bi\b/.test(text)) issues.push({level:2, msg:'第一人称 "I" 必须大写'});
+
+        if ((text.match(/\(/g)||[]).length !== (text.match(/\)/g)||[]).length) issues.push({level:2, msg:'圆括号未配对'});
+
+// a/an 发音、时态、主谓一致由 GrammarRules 模块处理（见文件末尾）
+
+        const raw = text.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) || [];
+        const sentences = raw.map(s=>s.trim()).filter(s=>s.length>0);
+        if (sentences.length < 4) issues.push({level:1, msg:`句子数量偏少（${sentences.length} 句），摘要一般为 4~8 句`});
+        sentences.forEach((s, i)=>{
+            if (/^[\d\s'"()\]]+$/.test(s)) return;           
+            const label = `第 ${i+1} 句`;
+            if (/^[a-z]/.test(s)) issues.push({level:3, msg:`${label}句首字母未大写："${s.slice(0,24)}…"`});
+            if (!/[.!?]["')\]]*$/.test(s)) issues.push({level:2, msg:`${label}结尾缺少句点`});
+            const words = (s.match(/[A-Za-z'-]+/g) || []).map(w=>w.toLowerCase());
+            if (words.length === 0) return;
+            if (words.length <= 3) issues.push({level:1, msg:`${label}过短（${words.length} 词），可能是残句`});
+            else if (!hasVerb(words)) issues.push({level:2, msg:`${label}可能缺少谓语动词`});
+        });
+
+        // 接入启发式语法模块（冠词/时态/主谓一致）
+        if (typeof GrammarRules === 'function' || (window.GrammarRules && typeof window.GrammarRules.runAll === 'function')) {
+            const gram = GrammarRules.runAll(text);
+            gram.forEach(g => {
+                const w = g.confidence === 'high' ? 2 : g.confidence === 'mid' ? 1 : 0;
+                issues.push({
+                    level: w,
+                    msg: (g.confidence==='mid' ? '【疑似】' : g.confidence==='low' ? '【建议】' : '') + g.message,
+                    ruleId: g.ruleId, confidence: g.confidence,
+                    start: g.start, end: g.end, suggestion: g.suggestion
+                });
+            });
+        }
+
+        return issues;
+    }
+
+ 
+    function keywordHit(text, kw){
+        const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = kw.trim().toLowerCase().split(/\s+/).map(esc);
+        parts[parts.length-1] += "(?:'s|s|es|ed|d|ing)?";
+        return new RegExp("\\b" + parts.join("[\\s\\-]+") + "\\b").test(text.toLowerCase());
+    }
+
+  
+    function contentWordSet(text){
+        const set = new Set();
+        (text.toLowerCase().match(/[a-z][a-z'-]{2,}/g) || []).forEach(w=>{ if(!STOPWORDS.has(w)) set.add(w); });
+        return set;
+    }
+
+    function wordInSet(set, w){
+        const forms = [w, w+'s', w+'es', w.replace(/s$/,''), w.replace(/es$/,''), w.replace(/ies$/,'y'), w.replace(/(ing|ed|d)$/,'')];
+        return forms.some(f => f && set.has(f));
+    }
+
+    // 固定搭配识别：把 "英文｜中文" 中的英文部分编译为正则，容忍词形变化、空缺成分与可选词
+    const COLL_NO_SUFFIX = new Set(("the a an of to in on for with at by from as than and or that this these those between among within per more most many well ever if no not such through during about over under up down out off").split(" "));
+    // 冠词/限定词后可插入 0~2 个形容词（the primary reason、a major threat 等）
+    const COLL_DET = new Set(("the a an this these those its their our my your his her").split(" "));
+    // 常见不规则动词形式（用于搭配首词形还原）
+    const COLL_IRREG = {
+        make:['made','making'], wake:['woke','woken','waking'], draw:['drew','drawn','drawing'],
+        take:['took','taken','taking'], begin:['began','begun','beginning'], drive:['drove','driven','driving'],
+        get:['got','gotten','getting'], hold:['held'], lead:['led'], find:['found'], give:['gave','given','giving'],
+        come:['came','coming'], become:['became','becoming'], see:['saw','seen','seeing'], run:['ran','running'],
+        show:['showed','shown'], grow:['grew','grown','growing'], rise:['rose','risen','rising'],
+        fall:['fell','fallen','falling'], spread:['spread'], keep:['kept'], leave:['left'],
+        feel:['felt'], bring:['brought'], spend:['spent'], mean:['meant'], think:['thought'], build:['built'], teach:['taught']
+    };
+
+    function collWordForms(w){
+        const set = new Set([w, w + 's', w + 'es', w + 'ed', w + 'd', w + 'ing']);
+        if (/e$/.test(w)) set.add(w.slice(0, -1) + 'ing');
+        if (/[^aeiou]y$/.test(w)) { set.add(w.slice(0, -1) + 'ies'); set.add(w.slice(0, -1) + 'ied'); }
+        (COLL_IRREG[w] || []).forEach(f => set.add(f));
+        return Array.from(set);
+    }
+
+    function collocationRegex(en){
+        const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        let pattern = '';
+        let prevAbsorb = false;
+        en.trim().split(/\s+/).forEach(tok => {
+            const low = tok.toLowerCase();
+            let re, absorb = false;
+            if (/^\(.*\)$/.test(tok)) {
+                re = '(?:' + esc(low.slice(1, -1)).replace(/-/g, '[\\s\\-]?') + '[\\s\\-]+)?';
+                absorb = true;
+            } else if (tok === '...') {
+                re = "[\\w$€£'’.-]+(?:[\\s\\-]+[\\w$€£'’.-]+){0,3}";
+            } else if (low === 'be') {
+                re = '(?:(?:be|am|is|are|was|were|been|being)[\\s\\-]+)?';
+                absorb = true;
+            } else if (low === "one's") {
+                re = "(?:[\\w'’-]+['’]s|my|your|his|her|its|our|their)";
+            } else if (tok === 'A' || tok === 'B' || low === 'sb' || low === 'do') {
+                re = "[\\w'’-]+";
+            } else if (COLL_DET.has(low)) {
+                const base = (low === 'a' || low === 'an') ? '(?:a|an)' : esc(low);
+                re = base + '[\\s\\-]+(?:[\\w\'’-]+[\\s\\-]+){0,2}';
+                absorb = true;
+            } else {
+                let body = esc(tok).replace(/-/g, '[\\s\\-]?');
+                if (/^[a-z]+$/i.test(tok) && tok.length >= 3 && !COLL_NO_SUFFIX.has(low)) {
+                    re = '(?:' + collWordForms(low).map(esc).join('|') + ')';
+                } else {
+                    re = body;
+                }
+            }
+            if (pattern && !prevAbsorb) pattern += '[\\s\\-]+';
+            pattern += re;
+            prevAbsorb = absorb;
+        });
+        return new RegExp('\\b' + pattern + '\\b', 'i');
+    }
+
+    function findCollocations(text, id){
+        const list = QUESTION_COLLOCATIONS[id] || [];
+        const matched = [], missed = [];
+        list.forEach(entry => {
+            const en = entry.split('｜')[0].trim();
+            let ok = false;
+            try { ok = collocationRegex(en).test(text); } catch (e) { ok = false; }
+            (ok ? matched : missed).push(en);
+        });
+        return { matched, missed, total: list.length };
+    }
+
+    function fillColor(ratio){
+        return ratio >= 0.8 ? '#27ae60' : ratio >= 0.5 ? '#e67e22' : '#e74c3c';
+    }
+
+    // 在原文中按 start/end 偏移标红高置信错误、琥珀标疑似
+    function highlightErrors(text, issues){
+        if(!issues) return escapeHtml(text);
+        const rs = issues.filter(i=>isFinite(i.start)&&isFinite(i.end)&&i.start>=0&&i.end>i.start&&i.end<=text.length && (i.confidence==='high'||i.confidence==='mid'));
+        if(!rs.length) return escapeHtml(text);
+        rs.sort((a,b)=>a.start-b.start);
+        const merged=[];
+        for(const r of rs){
+            const last=merged[merged.length-1];
+            if(last && r.start<=last.end){ last.end=Math.max(last.end,r.end); last.conf='high'; }
+            else merged.push({start:r.start,end:r.end,conf:r.confidence});
+        }
+        let html='', pos=0;
+        for(const m of merged){
+            html += escapeHtml(text.slice(pos,m.start));
+            html += '<mark class="' + (m.conf==='high'?'g-err':'g-susp') + '">' + escapeHtml(text.slice(m.start,m.end)) + '</mark>';
+            pos=m.end;
+        }
+        html += escapeHtml(text.slice(pos));
+        return html;
+    }
+
+    function scoreAnswer(){
+        const panel = document.getElementById('scorePanel');
+        const text = document.getElementById('userAnswer').value.trim();
+        if (currentIndex < 0) return;
+        if (!text){
+            panel.innerHTML = '<div class="score-empty">请先输入内容再评分。</div>';
+            panel.classList.add('show');
+            return;
+        }
+        const q = questions[currentIndex];
+
+        // 1. 内容覆盖（30 分）
+        const kws = q.keywords.split(/[;,，；]/).map(s=>s.trim()).filter(Boolean);
+        const missed = kws.filter(k => !keywordHit(text, k));
+        const kwScore = kws.length ? Math.round((kws.length - missed.length) / kws.length * 30) : 30;
+
+        
+        const issues = checkGrammarIssues(text);
+        const grScore = Math.max(0, 25 - issues.reduce((a,i)=>a+i.level, 0));
+
+       
+        const refWords = contentWordSet(q.abstract);
+        const userWords = contentWordSet(text);
+        let hit = 0;
+        userWords.forEach(w => { if (wordInSet(refWords, w)) hit++; });
+        const recall = refWords.size ? hit / refWords.size : 0;
+
+        // 识别用户答案中命中的固定搭配
+        const coll = findCollocations(text, q.id);
+        const recallPart = Math.min(recall / 0.5, 1);
+        const collPart = coll.total ? coll.matched.length / coll.total : 0;
+        const simScore = Math.round(25 * (coll.total ? 0.7 * recallPart + 0.3 * collPart : recallPart));
+
+      
+        const wc = text.split(/\s+/).length;
+        let wcScore, wcMsg;
+        if (wc >= 120 && wc <= 150)              { wcScore = 20; wcMsg = '词数达标'; }
+        else if ((wc>=100 && wc<120) || (wc>150 && wc<=170)) { wcScore = 15; wcMsg = `词数 ${wc}，略偏离 120-150`; }
+        else if ((wc>=80  && wc<100) || (wc>170 && wc<=190)) { wcScore = 10; wcMsg = `词数 ${wc}，偏离目标区间较多`; }
+        else                                       { wcScore = Math.max(0, Math.round(wc/120*10)); wcMsg = `词数 ${wc}，严重不足或超出`; }
+
+        renderScorePanel(panel, {
+            total: kwScore + grScore + simScore + wcScore,
+            kwScore, missed, grScore, issues, simScore, recall, coll, wcScore, wcMsg,
+            preview: highlightErrors(text, issues)
+        });
+    }
+
+    function renderScorePanel(panel, r){
+        const grade = r.total >= 85 ? '优秀' : r.total >= 70 ? '良好' : r.total >= 60 ? '及格' : '需要努力';
+        const rows = [
+            {label:'内容覆盖（30）',  score:r.kwScore,  max:30, tip: r.missed.length ? '未覆盖关键词：<span class="score-missed">'+r.missed.map(escapeHtml).join('、')+'</span>' : '关键词全部覆盖'},
+            {label:'语法正确性（25）', score:r.grScore,  max:25, tip: r.issues.length ? r.issues.length + ' 处待改进（见下方列表）' : '未发现明显语法问题'},
+            {label:'表达贴近度（25）', score:r.simScore, max:25, tip: '内容词重合率约 ' + Math.round(r.recall*100) + '%；固定搭配命中 ' + r.coll.matched.length + '/' + r.coll.total + (r.coll.matched.length ? '<span class="score-coll">已识别：' + r.coll.matched.map(escapeHtml).join('、') + '</span>' : '')},
+            {label:'词数（20）',      score:r.wcScore,  max:20, tip: r.wcMsg}
+        ];
+        let html = '<div class="score-total">' + r.total + ' / 100</div><div class="score-grade">' + grade + '（启发式评分，仅供参考）</div>';
+        if (r.preview) html += '<div class="grammar-preview">' + r.preview + '</div>';
+        rows.forEach(row => {
+            const ratio = row.score / row.max;
+            html += '<div class="score-row"><span class="score-label">' + row.label + '</span>'
+                  + '<div class="score-bar"><div class="score-fill" style="width:' + Math.round(ratio*100) + '%;background:' + fillColor(ratio) + '"></div></div>'
+                  + '<span class="score-val">' + row.score + '</span></div>'
+                  + '<div class="score-tip">' + row.tip + '</div>';
+        });
+        if (r.issues.length){
+            html += '<ul class="score-issues">';
+            r.issues.forEach(i => {
+                let cls;
+                if (i.confidence === 'mid') cls = 'susp';
+                else if (i.confidence === 'low') cls = 'suggest';
+                else cls = i.level >= 3 ? 'err' : (i.level === 2 ? 'warnx' : 'warnx');
+                let extra = '';
+                if (i.suggestion) extra = '<span class="issue-sug">→ ' + escapeHtml(i.suggestion) + '</span>';
+                html += '<li class="' + cls + '">' + escapeHtml(i.msg) + extra + '</li>';
+            });
+            html += '</ul>';
+        }
+        html += '<div class="score-note">提示：系统目前只能识别题库已收录的固定搭配，未命中不代表你的巧思不对哦～</div>';
+        panel.innerHTML = html;
+        panel.classList.add('show');
+    }
+
+   
+    function resetTimer() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        document.getElementById('timerDisplay').classList.remove('is-running');
+        timeLeft = 20 * 60;
+        updateTimerDisplay();
+    }
+
+    function toggleTimer() {
+        const el = document.getElementById('timerDisplay');
+        if (timerInterval) {          
+            clearInterval(timerInterval);
+            timerInterval = null;
+            el.classList.remove('is-running');
+            return;
+        }
+        if (timeLeft <= 0) return;    
+        el.classList.add('is-running');
+        timerInterval = setInterval(() => {
+            if (timeLeft > 0) {
+                timeLeft--;
+                updateTimerDisplay();
+            } else {
+                clearInterval(timerInterval);
+                timerInterval = null;
+                el.classList.remove('is-running');
+                alert("时间到！请检查并核对答案。");
+            }
+        }, 1000);
+    }
+
+    function updateTimerDisplay() {
+        const m = Math.floor(timeLeft / 60).toString().padStart(2, '0');
+        const s = (timeLeft % 60).toString().padStart(2, '0');
+        document.getElementById('timerDisplay').innerText = `${m}:${s}`;
+    }

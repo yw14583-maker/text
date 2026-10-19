@@ -3,525 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大英翻译期中背诵指南</title>
-    <style>
-        /* CSS 变量：定义浅色和深色模式的色彩 */
-        :root {
-            --bg-color: #f4f7f6;
-            --text-main: #333333;
-            --text-muted: #666666;
-            --card-bg: #ffffff;
-            --card-border: #e0e0e0;
-            --header-bg: rgba(255, 255, 255, 0.95);
-            --header-shadow: rgba(0, 0, 0, 0.05);
-            --skeleton-color: #1a1a1a;
-            --detail-bg: #f9fbfc;
-            --detail-color: #4a6572;
-            --accent-color: #3498db;
-            --hover-bg: #f0f4f8;
-        }
-
-        [data-theme="dark"] {
-            --bg-color: #121212;
-            --text-main: #e0e0e0;
-            --text-muted: #a0a0a0;
-            --card-bg: #1e1e1e;
-            --card-border: #333333;
-            --header-bg: rgba(30, 30, 30, 0.95);
-            --header-shadow: rgba(0, 0, 0, 0.2);
-            --skeleton-color: #ffffff;
-            --detail-bg: #2a2a2a;
-            --detail-color: #90caf9;
-            --accent-color: #64b5f6;
-            --hover-bg: #2c2c2c;
-        }
-
-        /* 全局基础样式 */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            transition: background-color 0.3s, color 0.3s;
-            line-height: 1.6;
-        }
-
-        /* 顶部悬浮导航 */
-        header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            background-color: var(--header-bg);
-            backdrop-filter: blur(5px);
-            box-shadow: 0 2px 10px var(--header-shadow);
-            z-index: 1000;
-            padding: 15px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        header h1 {
-            font-size: 1.2rem;
-            font-weight: bold;
-        }
-
-        .theme-toggle {
-            background: none;
-            border: 2px solid var(--card-border);
-            color: var(--text-main);
-            padding: 6px 12px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-        }
-
-        .theme-toggle:hover {
-            border-color: var(--accent-color);
-            color: var(--accent-color);
-        }
-
-        /* 主体内容容器 */
-        .container {
-            max-width: 800px;
-            margin: 80px auto 40px;
-            padding: 0 15px;
-        }
-
-        /* 卡片样式 */
-        .card {
-            background-color: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            margin-bottom: 15px;
-            overflow: hidden;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-            transition: background-color 0.3s, border-color 0.3s;
-        }
-
-        /* 卡片标题栏（可点击） */
-        .card-header {
-            padding: 16px 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            font-size: 1.1rem;
-            font-weight: bold;
-            background-color: transparent;
-            transition: background-color 0.2s;
-        }
-
-        .card-header:hover {
-            background-color: var(--hover-bg);
-        }
-
-        .card-header .icon {
-            font-size: 1.5rem;
-            color: var(--text-muted);
-            transition: transform 0.3s;
-        }
-
-        /* 卡片内容区（折叠状态） */
-        .card-content {
-            display: none;
-            padding: 0 20px 20px;
-            border-top: 1px solid var(--card-border);
-        }
-
-        .card.active .card-content {
-            display: block;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-
-        .card.active .card-header .icon {
-            transform: rotate(45deg);
-        }
-
-        /* 内容排版细节 */
-        h3 {
-            font-size: 1rem;
-            color: var(--accent-color);
-            margin: 15px 0 10px;
-            display: flex;
-            align-items: center;
-        }
-
-        .skeleton-box {
-            font-weight: bold;
-            color: var(--skeleton-color);
-            font-size: 1.05rem;
-            margin-bottom: 10px;
-        }
-
-        .skeleton-box p {
-            margin-bottom: 6px;
-        }
-
-        .detail-box {
-            background-color: var(--detail-bg);
-            padding: 12px 20px;
-            border-radius: 6px;
-            color: var(--detail-color);
-            font-size: 0.95rem;
-        }
-
-        .detail-box li {
-            margin-bottom: 6px;
-        }
-
-        /* 动画 */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(-5px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        /* 响应式适配 */
-        @media (max-width: 600px) {
-            header h1 {
-                font-size: 1.1rem;
-            }
-            .container {
-                margin-top: 70px;
-            }
-            .card-header {
-                font-size: 1rem;
-                padding: 14px 15px;
-            }
-            .card-content {
-                padding: 0 15px 15px;
-            }
-        }
-    </style>
+    <title>期末英语摘要写作模拟系统</title>
+    <link rel="stylesheet" href="style.css?v=20261019m">
 </head>
 <body>
 
-    <header>
-        <h1>大英2翻译背诵 (前15篇)</h1>
-        <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">切换深色</button>
-    </header>
+<div class="container">
+    <h1>英文摘要写作模拟系统</h1>
+    <div class="subtitle">2026-2027第一学期期末考试题库</div>
 
-    <div class="container" id="content-container">
+    <section>
+        <div>
+            <div>
+                <h3 class="profile-major">工业设计</h3>
+                <h3 class="profile-class">25-1</h3>
+                <h3 class="profile-name">吴嘉俊</h3>
+                <h4>有问题可以加我微信一起解决 微信号：<b>w857712022</b></h4>
+
+            </div>
+        </div>
+    </section>
+    <div class="control-panel">
+        <div class="btn-group">
+            <button onclick="drawRandomQuestion()">随机抽题</button>
+            <button class="outline" onclick="prevQuestion()">上一题</button>
+            <button class="outline" onclick="nextQuestion()">下一题 </button>
+            <select id="questionSelect" onchange="selectQuestion(this.value)">
+                <option value="">-- 选择具体题目 --</option>
+            </select>
+        </div>
+        <div class="timer-box">
+             <span id="timerDisplay" onclick="toggleTimer()" title="点击开始/暂停">20:00</span>
+            <button class="outline" style="padding: 2px 8px; font-size: 12px; margin-left: 5px;" onclick="resetTimer()">重置</button>
+        </div>
+    </div>
+
+   
+    <div id="questionCard" class="card">
+        <div class="question-header">
+            <h2 id="qTitle" class="question-title"></h2>
+        </div>
+        
+        <div id="qDirections" class="directions"></div>
+        
+     
+        <div class="writing-area">
+            <h5>请在下方输入英文摘要<span class="target-hint">目标 120–150 词</span></h5>
+            <textarea id="userAnswer" placeholder="Type your English abstract here..." oninput="updateWordCount();saveCurrentAnswer()"></textarea>
+            
+            <div class="action-row">
+                <span class="word-count" id="wordCountDisplay">单词数: 0 词</span>
+                <div class="btn-group">
+                    <button class="warning" onclick="clearAnswer()">清空</button>
+                    <button class="score" onclick="scoreAnswer()">评分</button>
+                    <button class="secondary" onclick="toggleAnswer()">参考答案</button>
+                </div>
+            </div>
+            <div id="scorePanel" class="score-panel"></div>
         </div>
 
-    <script>
-        // 核心数据：15篇翻译骨架与细节
-        const translations = [
-            {
-                title: "1. 京杭大运河",
-                skeleton: [
-                    "1. A, B, is C and D.",
-                    "2. A was built in B and has a history of C.",
-                    "3. A runs from B to C, passing through D. It is E, F.",
-                    "4. A plays an important role in doing B."
-                ],
-                details: [
-                    "The Beijing-Hangzhou Grand Canal",
-                    "the Spring and Autumn Period",
-                    "more than 2,500 years",
-                    "second only to the Yangtze River",
-                    "economic interaction and cultural exchange"
-                ]
-            },
-            {
-                title: "2. 移动支付",
-                skeleton: [
-                    "1. In B, A has developed rapidly in C.",
-                    "2. With B, A has become a trend.",
-                    "3. As B, A prefer to do C instead of D.",
-                    "4. To do B, A give discounts to C.",
-                    "5. A predict that B has potential for development."
-                ],
-                details: [
-                    "mobile payment market",
-                    "With the advent of mobile internet",
-                    "pay by phone / in cash / by credit card",
-                    "great potential for development"
-                ]
-            },
-            {
-                title: "3. 智能手机与阅读",
-                skeleton: [
-                    "1. Due to B, the number of A has grown at C in D.",
-                    "2. This has changed the way A do B.",
-                    "3. A often do B, and can also do C.",
-                    "4. As a result, A have been affected.",
-                    "5. However, surveys show that despite B, A still prefer doing C."
-                ],
-                details: [
-                    "communication networks",
-                    "at an amazing rate",
-                    "paper books / printed books",
-                    "mobile reading market"
-                ]
-            },
-            {
-                title: "4. 手机依赖",
-                skeleton: [
-                    "1. Nowadays, A cannot live without B.",
-                    "2. Many of A, including B, do C.",
-                    "3. A also do B as C.",
-                    "4. However, A makes B over-reliant on C.",
-                    "5. In fact, A have become so addicted that B."
-                ],
-                details: [
-                    "an increasing number of Chinese people",
-                    "keep in touch with others using apps",
-                    "shop online and search for information",
-                    "face-to-face communication"
-                ]
-            },
-            {
-                title: "5. 发红包",
-                skeleton: [
-                    "1. Doing A is a way for B to do C.",
-                    "2. In the past, A gave B C to do D.",
-                    "3. Nowadays, A are B as well.",
-                    "4. In recent years, A have become popular as B.",
-                    "5. When doing A, B often do C to do D."
-                ],
-                details: [
-                    "red envelopes / lucky money",
-                    "Spring Festival",
-                    "WeChat red envelopes",
-                    "festive greetings"
-                ]
-            },
-            {
-                title: "6. 泥人张",
-                skeleton: [
-                    "1. A is a kind of B popular in C and appreciated by D.",
-                    "2. Its origin can be traced back to B and has a history of C.",
-                    "3. A are based on B from C.",
-                    "4. A can be B or C.",
-                    "5. Therefore, A are of great interest."
-                ],
-                details: [
-                    "Clay Figure Zhang",
-                    "folk painted sculpture",
-                    "late Qing Dynasty",
-                    "more than 180 years"
-                ]
-            },
-            {
-                title: "7. 风筝",
-                skeleton: [
-                    "1. In ancient times, A were called B.",
-                    "2. In B, A spent C doing D, which is E.",
-                    "3. In B, A were introduced to C.",
-                    "4. A were first brought to B by C.",
-                    "5. Since then, A has spread around the world."
-                ],
-                details: [
-                    "Spring and Autumn Period",
-                    "Mo-tse",
-                    "Tang Dynasty",
-                    "Marco Polo"
-                ]
-            },
-            {
-                title: "8. 对联",
-                skeleton: [
-                    "1. A is comprised of B that are C.",
-                    "2. A is posted on B, and C is posted on D.",
-                    "3. In addition, A is posted across B.",
-                    "4. A is a part of B and also an art related to C.",
-                    "5. Today, A is often used as B during C."
-                ],
-                details: [
-                    "couplet",
-                    "the first line / the second line",
-                    "horizontal scroll",
-                    "door frame",
-                    "traditional Chinese festivals"
-                ]
-            },
-            {
-                title: "9. 孟子",
-                skeleton: [
-                    "1. A was a B and C in D.",
-                    "2. A advocated the idea that B.",
-                    "3. He emphasized that A should do B, believing that C.",
-                    "4. A believed that B, and that C causes D.",
-                    "5. Therefore, he attached great importance to B."
-                ],
-                details: [
-                    "Mencius",
-                    "Warring States Period",
-                    "human nature is essentially good",
-                    "moral decline",
-                    "moral education"
-                ]
-            },
-            {
-                title: "10. 中国结",
-                skeleton: [
-                    "1. A is a kind of B folk hand-woven decoration.",
-                    "2. In Chinese, A means B, so A is often used to do C.",
-                    "3. A is not only B, but also C.",
-                    "4. It carries A’s aspiration for B and commitment to C."
-                ],
-                details: [
-                    "the Chinese knot",
-                    "reunion, amity, peace and love",
-                    "traditional Chinese culture",
-                    "preserving traditional culture"
-                ]
-            },
-            {
-                title: "11. 网络流行语",
-                skeleton: [
-                    "1. With B, A spread quickly among C.",
-                    "2. They often come from B.",
-                    "3. A are short, funny, and easy to imitate.",
-                    "4. Although A are B, they reflect C.",
-                    "5. Proper use of A can improve B, but overuse may affect C."
-                ],
-                details: [
-                    "online buzzwords",
-                    "social hot topics",
-                    "standard expression"
-                ]
-            },
-            {
-                title: "12. 大学生创业",
-                skeleton: [
-                    "1. In recent years, A have chosen to do B.",
-                    "2. They use A to do B.",
-                    "3. A helps B do C and also promotes D.",
-                    "4. However, A is not easy, as it involves B.",
-                    "5. The key to success lies in A and B."
-                ],
-                details: [
-                    "start their own businesses",
-                    "professional knowledge and creative ideas",
-                    "practical skills",
-                    "risks and pressure",
-                    "persistence and good planning"
-                ]
-            },
-            {
-                title: "13. 大学交友",
-                skeleton: [
-                    "1. Doing A is an important part of B.",
-                    "2. A meet B by doing C.",
-                    "3. Good A not only B but also C.",
-                    "4. A come from B, which helps C do D.",
-                    "5. Healthy A contribute to B and lay a foundation for C."
-                ],
-                details: [
-                    "college life",
-                    "joining clubs, class discussions, volunteer work",
-                    "broaden their horizons",
-                    "personal growth"
-                ]
-            },
-            {
-                title: "14. 大学生科技创新",
-                skeleton: [
-                    "1. A are an important force in B.",
-                    "2. Many A encourage B to do C to improve D.",
-                    "3. Through A, B try to do C.",
-                    "4. Some A have even been applied in B.",
-                    "5. A not only improves B but also promotes C."
-                ],
-                details: [
-                    "scientific and technological innovation",
-                    "research projects and innovation competitions",
-                    "practical skills and innovative spirit",
-                    "national progress in science and technology"
-                ]
-            },
-            {
-                title: "15. 共享经济",
-                skeleton: [
-                    "1. A is a new economic model.",
-                    "2. Through A, B can do C, which improves D.",
-                    "3. This model reduces A and brings B.",
-                    "4. The growth of A has created B, but it also faces C.",
-                    "5. Only with A can B develop in a C way."
-                ],
-                details: [
-                    "the sharing economy",
-                    "online platforms",
-                    "resources utilization",
-                    "management and trust issues",
-                    "healthy and sustainable way"
-                ]
-            }
-        ];
+        
+        <div id="answerBox" class="answer-section">
+            <div class="ans-title">参考答案:</div>
+            <div id="qAbstract" class="abstract-text"></div>
+            <div class="ans-title">关键词:</div>
+            <div id="qKeywords" class="keywords"></div>
+        </div>
+    </div>
+</div>
 
-        // 初始化页面渲染
-        function renderCards() {
-            const container = document.getElementById('content-container');
-            
-            translations.forEach((item, index) => {
-                // 拼接骨架HTML
-                const skeletonHtml = item.skeleton.map(s => `<p>${s}</p>`).join('');
-                // 拼接细节HTML
-                const detailsHtml = item.details.map(d => `<li>${d}</li>`).join('');
+<script src="text-pos.js?v=20261019m"></script>
+<script src="grammar-rules.js?v=20261019m"></script>
+<script src="app.js?v=20261019m"></script>
 
-                const cardHtml = `
-                    <div class="card">
-                        <div class="card-header" onclick="toggleCard(this)">
-                            <span>${item.title}</span>
-                            <span class="icon">+</span>
-                        </div>
-                        <div class="card-content">
-                            <h3>📌 骨架（主干）</h3>
-                            <div class="skeleton-box">
-                                ${skeletonHtml}
-                            </div>
-                            <h3>💡 固定细节（必背）</h3>
-                            <ul class="detail-box">
-                                ${detailsHtml}
-                            </ul>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += cardHtml;
-            });
-        }
-
-        // 折叠/展开逻辑
-        function toggleCard(headerElement) {
-            const card = headerElement.parentElement;
-            card.classList.toggle('active');
-            
-            // 切换加减号
-            const icon = headerElement.querySelector('.icon');
-            if (card.classList.contains('active')) {
-                icon.textContent = '×';
-                icon.style.transform = 'rotate(90deg)';
-            } else {
-                icon.textContent = '+';
-                icon.style.transform = 'rotate(0deg)';
-            }
-        }
-
-        // 深浅色主题切换逻辑
-        function toggleTheme() {
-            const body = document.documentElement;
-            const btn = document.getElementById('themeBtn');
-            
-            if (body.getAttribute('data-theme') === 'dark') {
-                body.removeAttribute('data-theme');
-                btn.textContent = '切换深色';
-            } else {
-                body.setAttribute('data-theme', 'dark');
-                btn.textContent = '切换浅色';
-            }
-        }
-
-        // 页面加载完成后执行渲染
-        window.onload = renderCards;
-    </script>
 </body>
 </html>

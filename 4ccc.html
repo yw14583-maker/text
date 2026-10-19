@@ -171,6 +171,49 @@
             border: 1px solid #e2e8f0;
         }
         .keywords { font-style: italic; color: #555; }
+
+        /* 评分模块 */
+        button.score { background-color: #8e44ad; }
+        button.score:hover { background-color: #703688; }
+        .score-panel { display: none; margin-top: 15px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; background: #fff; }
+        .score-panel.show { display: block; }
+        .score-total { font-size: 24px; font-weight: bold; text-align: center; }
+        .score-grade { text-align: center; font-size: 13px; color: #64748b; margin-bottom: 12px; }
+        .score-row { display: flex; align-items: center; gap: 10px; margin-bottom: 2px; font-size: 13px; }
+        .score-label { width: 120px; flex-shrink: 0; color: #475569; }
+        .score-bar { flex: 1; height: 10px; background: #f1f5f9; border-radius: 5px; overflow: hidden; }
+        .score-fill { height: 100%; border-radius: 5px; transition: width .4s; }
+        .score-val { width: 36px; text-align: right; font-weight: bold; }
+        .score-tip { font-size: 12px; color: #94a3b8; margin: 0 0 8px 130px; }
+        .score-issues { margin: 10px 0 0; padding-left: 20px; font-size: 13px; }
+        .score-issues li { margin-bottom: 4px; line-height: 1.5; }
+        .score-issues .err { color: #c0392b; }
+        .score-issues .warnx { color: #d35400; }
+        .score-missed { color: #c0392b; }
+        .score-empty { color: #64748b; text-align: center; }
+        @media (max-width: 640px) {
+            .score-label { width: 88px; font-size: 12px; }
+            .score-tip { margin-left: 98px; }
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 640px) {
+            body { padding: 8px; }
+            .container { padding: 15px; border-radius: 10px; }
+            h1 { font-size: 22px; }
+            .subtitle { font-size: 12px; }
+            .control-panel { flex-direction: column; align-items: stretch; }
+            .btn-group { flex-wrap: wrap; }
+            .btn-group button { flex: 1 1 40%; }
+            select { width: 100%; }
+            select, button, textarea { font-size: 16px; }
+            .timer-box { display: flex; justify-content: space-between; align-items: center; }
+            .card { padding: 15px; }
+            .question-title { font-size: 18px; }
+            .directions { font-size: 13px; padding: 12px; }
+            .action-row { flex-direction: column; align-items: stretch; gap: 8px; }
+            .word-count { text-align: center; }
+        }
     </style>
 </head>
 <body>
@@ -221,9 +264,11 @@
                 <span class="word-count" id="wordCountDisplay">单词数: 0 词</span>
                 <div class="btn-group">
                     <button class="warning" onclick="clearAnswer()">清空</button>
+                    <button class="score" onclick="scoreAnswer()">评分</button>
                     <button class="secondary" onclick="toggleAnswer()">参考答案</button>
                 </div>
             </div>
+            <div id="scorePanel" class="score-panel"></div>
         </div>
 
         
@@ -450,6 +495,7 @@
         
         updateWordCount();
         document.getElementById('answerBox').classList.remove('show');
+        document.getElementById('scorePanel').classList.remove('show');
         document.getElementById('questionCard').classList.add('active');
         document.getElementById('questionSelect').value = index;
 
@@ -502,6 +548,161 @@
 
     function toggleAnswer() {
         document.getElementById('answerBox').classList.toggle('show');
+    }
+
+    // ===================== 评分模块（纯前端启发式） =====================
+    // 总分 100：内容覆盖 30 + 语法正确性 25 + 表达贴近度 25 + 词数 20
+
+    const STOPWORDS = new Set(("the a an and or but of to in on for with at by from as is are was were be been being have has had do does did we our this that these those it its they their he she you your his her not no than then so such more most other into over under between about through during before after up down out off again once here there when where why how all any both each few some own same only very can will just should now also may might must would could which who whom whose what if because while although however therefore thus via per vs etc").split(" "));
+
+    const COMMON_VERBS = new Set(("go goes went come came make made take took get got give gave show showed find found use used develop developed test tested study studied analyze analyzed examine examined investigate investigated report reported suggest suggested indicate indicated reveal revealed demonstrate demonstrated present presented propose proposed describe described provide provided include included increase increased decrease decreased reduce reduced improve improved affect affected influence influenced cause caused lead led result resulted remain remained appear appeared seem seemed become became help helped allow allowed enable enabled perform performed conduct conducted collect collected compare compared assess assessed evaluate evaluated measure measured observe observed identify identified determine determined explore explored exist existed change changed grow grew decline declined rise rose fall fell reach reached exceed exceeded threaten threatened halt halted recover recovered support supported reflect reflected").split(" "));
+
+    const VERB_CLUE = /(s|es|ed|d|ing)$/;
+    const AUX_RE = /^(is|are|was|were|be|been|being|has|have|had|do|does|did|will|would|can|could|may|might|must|shall|should)$/;
+
+    function escapeHtml(s){
+        return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function hasVerb(words){
+        return words.some(w => AUX_RE.test(w) || COMMON_VERBS.has(w) || VERB_CLUE.test(w));
+    }
+
+    // 语法检查：返回问题列表 {level: 扣分值, msg}
+    function checkGrammarIssues(text){
+        const issues = [];
+
+        const zhPunc = text.match(/[，。；：！？（）【】“”‘’]/g);
+        if (zhPunc) issues.push({level:3, msg:`使用了中文标点（${[...new Set(zhPunc)].join(' ')}），英文写作请用半角标点`});
+
+        if (/[a-zA-Z],[a-zA-Z]/.test(text)) issues.push({level:2, msg:'存在逗号后缺少空格的情况（如 "May,2015"）'});
+
+        const rep = text.match(/\b([A-Za-z]+)\s+\1\b/gi);
+        if (rep) issues.push({level:3, msg:`疑似重复单词：${[...new Set(rep.map(s=>s.toLowerCase()))].join(', ')}`});
+
+        if (/\bi\b/.test(text)) issues.push({level:2, msg:'第一人称 "I" 必须大写'});
+
+        if ((text.match(/\(/g)||[]).length !== (text.match(/\)/g)||[]).length) issues.push({level:2, msg:'圆括号未配对'});
+
+        // a / an 误用（含 hour、university 等常见例外）
+        const anSound = ['hour','honest','honor','honour','heir'];
+        const aSound  = ['university','unique','united','uniform','universal','user','european','one','once','ufo'];
+        const anRe = /\b(a|an)\s+([A-Za-z]+)/gi;
+        let m;
+        while ((m = anRe.exec(text)) !== null){
+            const art = m[1].toLowerCase(), w = m[2].toLowerCase();
+            const vowelSound = /^[aeiou]/.test(w) ? !aSound.includes(w) : anSound.includes(w);
+            if (art === 'a'  &&  vowelSound) issues.push({level:2, msg:`冠词误用："a ${m[2]}" 应为 "an ${m[2]}"`});
+            if (art === 'an' && !vowelSound) issues.push({level:2, msg:`冠词误用："an ${m[2]}" 应为 "a ${m[2]}"`});
+        }
+
+        // 逐句检查
+        const raw = text.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) || [];
+        const sentences = raw.map(s=>s.trim()).filter(s=>s.length>0);
+        if (sentences.length < 4) issues.push({level:1, msg:`句子数量偏少（${sentences.length} 句），摘要一般为 4~8 句`});
+        sentences.forEach((s, i)=>{
+            if (/^[\d\s'"()\]]+$/.test(s)) return;              // 跳过纯数字碎片（如 1.5 被拆开后的 "1."）
+            const label = `第 ${i+1} 句`;
+            if (/^[a-z]/.test(s)) issues.push({level:3, msg:`${label}句首字母未大写："${s.slice(0,24)}…"`});
+            if (!/[.!?]["')\]]*$/.test(s)) issues.push({level:2, msg:`${label}结尾缺少句点`});
+            const words = (s.match(/[A-Za-z'-]+/g) || []).map(w=>w.toLowerCase());
+            if (words.length === 0) return;
+            if (words.length <= 3) issues.push({level:1, msg:`${label}过短（${words.length} 词），可能是残句`});
+            else if (!hasVerb(words)) issues.push({level:2, msg:`${label}可能缺少谓语动词`});
+        });
+
+        return issues;
+    }
+
+    // 关键词命中（容忍单复数/时态变形、连字符）
+    function keywordHit(text, kw){
+        const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = kw.trim().toLowerCase().split(/\s+/).map(esc);
+        parts[parts.length-1] += "(?:'s|s|es|ed|d|ing)?";
+        return new RegExp("\\b" + parts.join("[\\s\\-]+") + "\\b").test(text.toLowerCase());
+    }
+
+    // 提取内容词（去停用词）
+    function contentWordSet(text){
+        const set = new Set();
+        (text.toLowerCase().match(/[a-z][a-z'-]{2,}/g) || []).forEach(w=>{ if(!STOPWORDS.has(w)) set.add(w); });
+        return set;
+    }
+
+    function wordInSet(set, w){
+        const forms = [w, w+'s', w+'es', w.replace(/s$/,''), w.replace(/es$/,''), w.replace(/ies$/,'y'), w.replace(/(ing|ed|d)$/,'')];
+        return forms.some(f => f && set.has(f));
+    }
+
+    function fillColor(ratio){
+        return ratio >= 0.8 ? '#27ae60' : ratio >= 0.5 ? '#e67e22' : '#e74c3c';
+    }
+
+    function scoreAnswer(){
+        const panel = document.getElementById('scorePanel');
+        const text = document.getElementById('userAnswer').value.trim();
+        if (currentIndex < 0) return;
+        if (!text){
+            panel.innerHTML = '<div class="score-empty">请先输入内容再评分。</div>';
+            panel.classList.add('show');
+            return;
+        }
+        const q = questions[currentIndex];
+
+        // 1. 内容覆盖（30 分）
+        const kws = q.keywords.split(/[;,，；]/).map(s=>s.trim()).filter(Boolean);
+        const missed = kws.filter(k => !keywordHit(text, k));
+        const kwScore = kws.length ? Math.round((kws.length - missed.length) / kws.length * 30) : 30;
+
+        // 2. 语法正确性（25 分）
+        const issues = checkGrammarIssues(text);
+        const grScore = Math.max(0, 25 - issues.reduce((a,i)=>a+i.level, 0));
+
+        // 3. 表达贴近度（25 分）：与参考答案内容词重合率，50% 重合即满分
+        const refWords = contentWordSet(q.abstract);
+        const userWords = contentWordSet(text);
+        let hit = 0;
+        userWords.forEach(w => { if (wordInSet(refWords, w)) hit++; });
+        const recall = refWords.size ? hit / refWords.size : 0;
+        const simScore = Math.min(25, Math.round(recall / 0.5 * 25));
+
+        // 4. 词数（20 分）
+        const wc = text.split(/\s+/).length;
+        let wcScore, wcMsg;
+        if (wc >= 120 && wc <= 150)              { wcScore = 20; wcMsg = '词数达标'; }
+        else if ((wc>=100 && wc<120) || (wc>150 && wc<=170)) { wcScore = 15; wcMsg = `词数 ${wc}，略偏离 120-150`; }
+        else if ((wc>=80  && wc<100) || (wc>170 && wc<=190)) { wcScore = 10; wcMsg = `词数 ${wc}，偏离目标区间较多`; }
+        else                                       { wcScore = Math.max(0, Math.round(wc/120*10)); wcMsg = `词数 ${wc}，严重不足或超出`; }
+
+        renderScorePanel(panel, {
+            total: kwScore + grScore + simScore + wcScore,
+            kwScore, missed, grScore, issues, simScore, recall, wcScore, wcMsg
+        });
+    }
+
+    function renderScorePanel(panel, r){
+        const grade = r.total >= 85 ? '优秀' : r.total >= 70 ? '良好' : r.total >= 60 ? '及格' : '需要努力';
+        const rows = [
+            {label:'内容覆盖（30）',  score:r.kwScore,  max:30, tip: r.missed.length ? '未覆盖关键词：<span class="score-missed">'+r.missed.map(escapeHtml).join('、')+'</span>' : '关键词全部覆盖'},
+            {label:'语法正确性（25）', score:r.grScore,  max:25, tip: r.issues.length ? r.issues.length + ' 处待改进（见下方列表）' : '未发现明显语法问题'},
+            {label:'表达贴近度（25）', score:r.simScore, max:25, tip: '与参考答案的内容词重合率约 ' + Math.round(r.recall*100) + '%'},
+            {label:'词数（20）',      score:r.wcScore,  max:20, tip: r.wcMsg}
+        ];
+        let html = '<div class="score-total">' + r.total + ' / 100</div><div class="score-grade">' + grade + '（启发式评分，仅供参考）</div>';
+        rows.forEach(row => {
+            const ratio = row.score / row.max;
+            html += '<div class="score-row"><span class="score-label">' + row.label + '</span>'
+                  + '<div class="score-bar"><div class="score-fill" style="width:' + Math.round(ratio*100) + '%;background:' + fillColor(ratio) + '"></div></div>'
+                  + '<span class="score-val">' + row.score + '</span></div>'
+                  + '<div class="score-tip">' + row.tip + '</div>';
+        });
+        if (r.issues.length){
+            html += '<ul class="score-issues">';
+            r.issues.forEach(i => { html += '<li class="' + (i.level >= 3 ? 'err' : 'warnx') + '">' + escapeHtml(i.msg) + '</li>'; });
+            html += '</ul>';
+        }
+        panel.innerHTML = html;
+        panel.classList.add('show');
     }
 
    
