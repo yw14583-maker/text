@@ -346,10 +346,21 @@
       var sb = subjectBefore(tokens, v);
       if (!sb) continue;
       var wv = tv.text;
+      // 1) be/have 助动词主谓一致（吸收 Gemini 亮点：独立分支，比通用 +s/es 更稳）
+      if (/^(is|are|was|were|has|have)$/i.test(wv)) {
+        if (PHYS_S.test(sb.name) || INDEF[sb.name]) continue; // 这二者交给 SVA-006 / SVA-004
+        var bmap = {};
+        if (sb.plural) bmap = {is:'are',was:'were',has:'have'};
+        else if (sb.third) bmap = {are:'is',were:'was',have:'has'};
+        if (bmap[wv]) {
+          addIssue(issues, { ruleId: sb.plural ? 'SVA-002' : 'SVA-001', category:'sva', confidence:'high', start:tv.start, end:tv.end, errorText:tv.raw, message:'『' + sb.name + '』' + (sb.plural ? '是复数主语，谓语要用复数形式' : '是第三人称单数主语，谓语要用单数形式'), suggestion:bmap[wv] });
+        }
+        continue;
+      }
       var hasS = /[sx]$/i.test(wv);
-      if (sb.third && !sb.plural && !hasS && !/^(is|has|does|am|was|are|were)$/.test(wv)) {
+      if (sb.third && !sb.plural && !hasS && !/^(is|has|does|am|was|are|were|have|do)$/i.test(wv)) {
         addIssue(issues, { ruleId:'SVA-001', category:'sva', confidence:'high', start:tv.start, end:tv.end, errorText:tv.raw, message:'一般现在时第三人称单数主语 "' + sb.name + '" 后，动词要加 s/es', suggestion:singularize(tv) });
-      } else if (sb.plural && hasS && !/^(is|has|does|are|were)$/.test(wv)) {
+      } else if (sb.plural && hasS && !/^(is|has|does|are|were)$/i.test(wv)) {
         addIssue(issues, { ruleId:'SVA-002', category:'sva', confidence:'high', start:tv.start, end:tv.end, errorText:tv.raw, message:'复数主语的一般现在时谓语动词不需要加 s/es', suggestion:pluralStrip(tv) });
       }
     }
