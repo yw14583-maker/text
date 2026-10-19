@@ -100,6 +100,7 @@
     for (var k = idx - 1; k >= 0; k--) {
       var t = tokens[k];
       if (t.text === ',' || t.text === ';' || t.text === '.' || t.text === 'and' || t.text === 'or' || t.text === 'but' || t.text === 'then' || t.text === 'to') return null;
+      if (t.text === 'there') continue; // 存在句 there 非真正主语
       if (MODALS[t.text]) return null;
       if (hasAnyTag(t, ['Adverb'])) continue;
       if (t.text === 'not' || t.text === 'also' || t.text === 'always' || t.text === 'often' || t.text === 'never' || t.text === 'usually' || t.text === 'however') continue;
@@ -301,15 +302,21 @@
       var v = tok(tokens, i + 1);
       if (v && (/^(are|were)$/.test(v.text))) addIssue(issues, { ruleId:'SVA-004', category:'sva', confidence:'high', start:tokens[i].start, end:v.end, errorText:text.slice(tokens[i].start, v.end), message:'everyone/nobody 等不定代词作主语，谓语动词用单数', suggestion:v.text==='are'?'is':'was' });
     }
-    // SVA-005 There be 就近原则
+    // SVA-005 There be 就近原则（含 A and B 并列主语、跳过介词短语宾语）
     for (var tb = 0; tb < n; tb++) {
       if (tokens[tb].text !== 'there') continue;
       var be = tok(tokens, tb + 1);
       if (!be || (be.text !== 'is' && be.text !== 'are')) continue;
-      var h = nextHeadNoun(tokens, tb + 2);
-      if (!h) continue;
-      if (be.text === 'is' && isPlural(h)) addIssue(issues, { ruleId:'SVA-005', category:'sva', confidence:'high', start:tokens[tb].start, end:tokens[tb].end + 20, errorText:text.slice(tokens[tb].start, Math.min(tokens[tb].end + 25, text.length)), message:'There be 遵循就近原则：紧接的是一个复数名词，be 动词应用复数(are)', suggestion:'There are …' });
-      else if (be.text === 'are' && !isPlural(h)) addIssue(issues, { ruleId:'SVA-005', category:'sva', confidence:'high', start:tokens[tb].start, end:tokens[tb].end + 20, errorText:text.slice(tokens[tb].start, Math.min(tokens[tb].end + 25, text.length)), message:'There be 遵循就近原则：紧接的是一个单数名词，be 动词应用单数(is)', suggestion:'There is …' });
+      var plu = false, kb = tb + 2;
+      for (; kb < Math.min(tb + 12, n); kb++) {
+        var tbx = tokens[kb];
+        if (tbx.text === '.' || tbx.text === ';' || tbx.text === '!') break;
+        if (hasTag(tbx, 'Preposition') || PREPS[tbx.text]) { while (kb + 1 < n && (isDeterminer(tokens[kb + 1]) || isNoun(tokens[kb + 1]) || /^\d+$/.test(tokens[kb + 1].text) || hasAnyTag(tokens[kb + 1], ['Number', 'Value', 'Cardinal']))) kb++; continue; }
+        if (isDeterminer(tbx) || /^\d+$/.test(tbx.text) || hasAnyTag(tbx, ['Number', 'Value', 'Cardinal'])) continue;
+        if ((isNoun(tbx) || looksPlural(tbx.text)) && (isPlural(tbx) || looksPlural(tbx.text))) plu = true;
+      }
+      var want = plu ? 'are' : 'is';
+      if (be.text !== want) addIssue(issues, { ruleId:'SVA-005', category:'sva', confidence:'high', start:tokens[tb].start, end:tokens[tb].end + 20, errorText:text.slice(tokens[tb].start, Math.min(tokens[tb].end + 25, text.length)), message:'There be 中主语' + (plu ? '为复数，be 动词应用复数(are)' : '为单数，be 动词应用单数(is)'), suggestion:'There ' + want + ' …' });
     }
     // SVA-006 s 结尾单数名词 + are
     for (var s6 = 0; s6 + 1 < n; s6++) {
@@ -341,6 +348,7 @@
     for (var v = 0; v < n; v++) {
       var tv = tokens[v];
       if (MODALS[tv.text]) continue;
+      if (PREPS[tv.text] || hasTag(tv, 'Preposition')) continue; // 介词不做谓语（防 compromise 误标 in/on...）
       if (!hasTag(tv, 'PresentTense') && !hasTag(tv, 'Verb')) continue;
       if (hasTag(tv, 'PastTense') || hasTag(tv, 'Gerund')) continue;
       var sb = subjectBefore(tokens, v);
