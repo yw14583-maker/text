@@ -286,13 +286,11 @@ const PROFILE_CONFIG =Object.freeze({
     function checkGrammarIssues(text){
         const issues = [];
 
-
+        // 汉字检测：摘要须用英文撰写，出现任何汉字语法项即判 0 分
         const cjkCount = (text.match(/[一-鿿]/g) || []).length;
-        if (cjkCount >= 0) {
+        if (cjkCount > 0) {
             issues.push({level:25, msg:`检测到 ${cjkCount} 个汉字，摘要必须用英文撰写，语法项不得分`});
             return issues;
-        } else if (cjkCount > 0) {
-            issues.push({level:5, msg:`文中混入 ${cjkCount} 个汉字，请改为英文表达`});
         }
 
         const zhPunc = text.match(/[，。；：！？（）【】“”‘’]/g);
@@ -431,17 +429,21 @@ const PROFILE_CONFIG =Object.freeze({
     function resetTimer() {
         clearInterval(timerInterval);
         timerInterval = null;
+        document.getElementById('timerDisplay').classList.remove('is-running');
         timeLeft = 20 * 60;
         updateTimerDisplay();
     }
 
     function toggleTimer() {
+        const el = document.getElementById('timerDisplay');
         if (timerInterval) {          
             clearInterval(timerInterval);
             timerInterval = null;
+            el.classList.remove('is-running');
             return;
         }
         if (timeLeft <= 0) return;    
+        el.classList.add('is-running');
         timerInterval = setInterval(() => {
             if (timeLeft > 0) {
                 timeLeft--;
@@ -449,6 +451,7 @@ const PROFILE_CONFIG =Object.freeze({
             } else {
                 clearInterval(timerInterval);
                 timerInterval = null;
+                el.classList.remove('is-running');
                 alert("时间到！请检查并核对答案。");
             }
         }, 1000);
