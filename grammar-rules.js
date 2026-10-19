@@ -18,6 +18,9 @@
   function looksPlural(w) { w = (w || '').toLowerCase(); if (!/[sx]$/i.test(w)) return false; if (PHYS_S.test(w)) return false; if (UNCOUNTABLE[w]) return false; return true; }
   // 可数名词复数：带 Plural 标签且非不可数/s 结尾单数
   function isCountPlural(t) { return hasTag(t, 'Plural') && !UNCOUNTABLE[t.text] && !PHYS_S.test(t.text); }
+  // 统计 [a,b) 字符区间内的有限谓语（一般现在/过去，非动名词）数量
+  function finCount(tokens, a, b) { var c = 0; for (var i = 0; i < tokens.length; i++) { var t = tokens[i]; if (t.start < a || t.start >= b) continue; if (hasTag(t, 'Verb') && (hasTag(t, 'PresentTense') || hasTag(t, 'PastTense')) && !hasTag(t, 'Gerund')) c++; } return c; }
+  function isFiniteVerb(t) { return hasTag(t, 'Verb') && (hasTag(t, 'PresentTense') || hasTag(t, 'PastTense')) && !hasTag(t, 'Gerund'); }
 
   var UNCOUNTABLE = {water:1,milk:1,juice:1,oil:1,rice:1,bread:1,sugar:1,salt:1,food:1,money:1,information:1,knowledge:1,advice:1,research:1,evidence:1,progress:1,news:1,furniture:1,equipment:1,baggage:1,luggage:1,traffic:1,weather:1,work:1,software:1,pollution:1,nature:1,literature:1,music:1,education:1,math:1,mathematics:1,physics:1,behaviour:1,behavior:1,'homework':1,'meat':1,'beef':1,'pork':1,'chicken':1,'fish':1,'toast':1,noise:1,damage:1,feedback:1,transport:1,transportation:1,accommodation:1,advertising:1,employment:1,rain:1,snow:1,warmth:1,darkness:1,oxygen:1,hydrogen:1};
   // a/an 之后不应误判为缺限定词单数名词的词（代词宾格、地点/时间副词、指示词等）
@@ -619,6 +622,30 @@
     }
   }
 
+  // RUN-001 逗号拼接：两个完整从句仅用逗号连接
+  function runRun(tokens, text, issues) {
+    var CONJ = /^(and|but|or|so|yet|for|nor|which|who|whom|whose|that|because|although|though|since|while|when|if|unless|until|after|before|as|however|therefore|thus|moreover|nevertheless|furthermore|meanwhile|instead|otherwise|then|also|besides)$/;
+    var reC = /,/g, m;
+    while ((m = reC.exec(text)) !== null) {
+      var cpos = m.index;
+      var a = Math.max(text.lastIndexOf('.', cpos - 1), text.lastIndexOf('!', cpos - 1), text.lastIndexOf('?', cpos - 1), text.lastIndexOf(';', cpos - 1), text.lastIndexOf(':', cpos - 1)) + 1;
+      var j = -1;
+      for (var i = 0; i < tokens.length; i++) { if (tokens[i].start > cpos) { j = i; break; } }
+      if (j < 0) continue;
+      var tk = tokens[j];
+      if (CONJ.test(tk.text)) continue; // 逗号后是连词/关系词/过渡词 → 正常
+      if (!(isDeterminer(tk) || hasAnyTag(tk, ['Pronoun', 'Noun']))) continue; // 逗号后须是新从句主语
+      if (finCount(tokens, a, cpos) < 1) continue; // 前段须是完整从句
+      var jp = -1;
+      for (var q = 0; q < tokens.length; q++) { if (tokens[q].start >= a) { jp = q; break; } }
+      if (jp >= 0 && /^(because|although|though|whereas|since|while|when|if|unless|until|as|that|which|who|whom|whose|whoever|whenever|wherever|even)$/.test(tokens[jp].text)) continue; // 前段为从句，逗号合法
+      var afterFin = false;
+      for (var k = j; k < tokens.length && k < j + 4; k++) { if (isFiniteVerb(tokens[k])) { afterFin = true; break; } }
+      if (!afterFin) continue;
+      addIssue(issues, { ruleId:'RUN-001', category:'run-on', confidence:'mid', start:cpos, end:cpos + 1, errorText:',', message:'【疑似】逗号拼接：两个完整句子不能仅用逗号连接，应用句号/分号或加连词', suggestion:'改用句号或分号，或加 and/but' });
+    }
+  }
+
   // FRAG-001 残句：以从属连词开头却无主句
   function runFrag(tokens, text, issues) {
     var reS = /[^.!?]+[.!?]+|[^.!?]+$/g, m;
@@ -659,6 +686,7 @@
       runClause(tokens, text, issues);
       runRed(tokens, text, issues);
       runRel(tokens, text, issues);
+      runRun(tokens, text, issues);
       runFrag(tokens, text, issues);
     }
     return issues;
