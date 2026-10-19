@@ -148,7 +148,7 @@ const PROFILE_CONFIG =Object.freeze({
 
     let currentIndex = -1;
     let timerInterval = null;
-    let timeLeft = 15 * 60; 
+    let timeLeft = 20 * 60; 
 
     const STORAGE_KEY = "englishAbstractAnswers_v1";
 
@@ -426,7 +426,7 @@ const PROFILE_CONFIG =Object.freeze({
     function resetTimer() {
         clearInterval(timerInterval);
         timerInterval = null;
-        timeLeft = 15 * 60;
+        timeLeft = 20 * 60;
         updateTimerDisplay();
     }
 
