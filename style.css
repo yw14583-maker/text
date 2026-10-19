@@ -1,30 +1,23 @@
-/* ============================================================
-   英文摘要写作模拟系统 — 温纸·学术编辑风格
-   设计语言：温暖纸感 / 衬线大标题 / 松木绿主色 / 琥珀与梅子点缀
-   维持全部原有的功能性 class / id，app.js 无需改动
-   ============================================================ */
-
 :root {
-    /* 纸与墨 */
     --paper:      #f2ecdf;
     --card:       #fffdf7;
-    --ink:        #26333f;   /* 标题墨色 */
-    --body:       #3d4a55;   /* 正文 */
-    --muted:      #7b8690;   /* 次要文字 */
-    --line:       #e3dac6;   /* 边框线 */
+    --ink:        #26333f;   
+    --body:       #3d4a55;  
+    --muted:      #7b8690;  
+    --line:       #e3dac6;  
     --line-strong:#d3c6a9;
 
-    /* 强调色系（大地色，避开通用的蓝紫渐变） */
-    --pine:       #3c6a5f;   /* 主色 · 松木绿 */
+  
+    --pine:       #3c6a5f;  
     --pine-deep:  #2f544b;
-    --amber:      #bd7a33;   /* 警示 · 琥珀 */
+    --amber:      #bd7a33;  
     --amber-deep: #9e6325;
-    --plum:       #6c4a63;   /* 评分 · 梅子 */
-    --olive:      #5a7d4a;   /* 答案 · 橄榄绿 */
-    --rose:       #c25b4a;   /* 计时 · 暖朱 */
+    --plum:       #6c4a63;   
+    --olive:      #5a7d4a;  
+    --rose:       #c25b4a;  
     --rose-bg:    #fbeae4;
 
-    /* 字体 */
+
     --font-display: Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", "STSong", serif;
     --font-body:    -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
 
@@ -40,7 +33,7 @@ body {
     color: var(--body);
     line-height: 1.6;
     margin: 0;
-    /* 纸纹：柔和的多层渐变取代纯色背景 */
+
     background:
         radial-gradient(1200px 500px at 12% -6%, rgba(255, 251, 240, .85), transparent 60%),
         radial-gradient(900px 420px at 92% 8%, rgba(189, 122, 51, .10), transparent 55%),
@@ -50,7 +43,7 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* ---------- 主容器 ---------- */
+
 .container {
     max-width: 920px;
     margin: 0 auto;
@@ -62,7 +55,7 @@ body {
     position: relative;
     overflow: hidden;
 }
-/* 顶部一条装饰"装订线" */
+
 .container::before {
     content: "";
     position: absolute;
@@ -72,7 +65,7 @@ body {
     opacity: .9;
 }
 
-/* ---------- 标题 ---------- */
+
 h1 {
     font-family: var(--font-display);
     font-weight: 700;
@@ -92,7 +85,7 @@ h1 {
     margin: 0 0 22px;
 }
 
-/* ---------- 作者信息 ---------- */
+
 section > div > div {
     display: flex;
     flex-wrap: wrap;
@@ -113,7 +106,7 @@ section > div > div {
     font-weight: 600;
     color: var(--ink);
 }
-/* 班级与姓名之间加分隔点 */
+
 .profile-class::before { content: ""; display: inline-block; width: 3px; height: 3px;
     border-radius: 50%; background: var(--amber); margin: 0 10px 3px; vertical-align: middle; }
 .profile-name::before { content: ""; display: inline-block; width: 3px; height: 3px;
@@ -130,7 +123,7 @@ section h4 {
 }
 section h4 b { color: var(--amber-deep); font-weight: 600; }
 
-/* ---------- 控制面板 ---------- */
+
 .control-panel {
     display: flex;
     flex-wrap: wrap;
@@ -177,7 +170,7 @@ button.score:hover { background: #5a3d52; }
 button.outline { background: transparent; color: #4a5a63; border: 1px solid var(--line-strong); box-shadow: none; }
 button.outline:hover { background: #f3ecdb; color: var(--ink); transform: translateY(-1px); }
 
-/* 下拉箭头 */
+
 select {
     background-image: linear-gradient(45deg, transparent 50%, var(--pine) 50%),
                       linear-gradient(135deg, var(--pine) 50%, transparent 50%);
@@ -187,7 +180,7 @@ select {
     padding-right: 36px;
 }
 
-/* ---------- 计时器 ---------- */
+
 .timer-box {
     display: inline-flex;
     align-items: center;
@@ -218,7 +211,6 @@ select {
 }
 .timer-box button { font-size: 11.5px; padding: 3px 10px; }
 
-/* ---------- 题目卡片 ---------- */
 .card {
     border: 1px solid var(--line);
     border-radius: var(--radius);
@@ -242,7 +234,6 @@ select {
     border-bottom: 2px solid var(--pine);
     position: relative;
 }
-/* 标题下方的小三角强调 */
 .question-header::after {
     content: "";
     position: absolute;
@@ -272,7 +263,7 @@ select {
     color: var(--body);
 }
 
-/* ---------- 写作区 ---------- */
+
 .writing-area { margin-top: 4px; }
 .writing-area h5 {
     margin: 0 0 10px;
@@ -327,7 +318,7 @@ textarea:focus {
     font-variant-numeric: tabular-nums;
 }
 
-/* ---------- 评分面板 ---------- */
+
 .score-panel {
     display: none;
     margin-top: 22px;
@@ -361,7 +352,7 @@ textarea:focus {
 .score-issues .warnx { color: var(--amber-deep); }
 .score-empty { color: var(--muted); text-align: center; padding: 8px; }
 
-/* ---------- 答案区 ---------- */
+
 .answer-section {
     margin-top: 26px;
     border-top: 2px dashed var(--line-strong);
@@ -390,9 +381,6 @@ textarea:focus {
 }
 .keywords { font-style: italic; color: var(--muted); }
 
-/* ============================================================
-   移动端适配
-   ============================================================ */
 @media (max-width: 680px) {
     body { padding: 10px 8px; }
     .container { padding: 18px 14px; border-radius: 12px; }
@@ -412,7 +400,7 @@ textarea:focus {
     .directions {
         font-size: 13px;
         padding: 13px 14px;
-        /* 软键盘弹出时，让中文提纲保持可见，避免被顶出屏幕 */
+       
         position: sticky;
         top: 0;
         z-index: 8;
@@ -421,7 +409,7 @@ textarea:focus {
         background: #f3ecdb;
         box-shadow: 0 6px 18px -10px rgba(60, 54, 40, .5);
     }
-    /* 输入时把中文提纲变为固定在屏幕顶端的悬浮条，键盘弹出也不会被顶走 */
+   
     .card:focus-within .directions {
         position: fixed;
         top: 0;
