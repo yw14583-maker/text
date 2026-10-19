@@ -31,6 +31,10 @@
   var COLLECTIVE = {family:1,team:1,class:1,group:1,committee:1,staff:1,audience:1,government:1,public:1,crew:1};
   var ORDINALS = {first:1,second:1,third:1,fourth:1,fifth:1,sixth:1,seventh:1,eighth:1,ninth:1,tenth:1};
   var SPORTS = {football:1,basketball:1,soccer:1,baseball:1,tennis:1,golf:1,chess:1,volleyball:1,badminton:1,swimming:1,skiing:1,hockey:1,rugby:1,cricket:1};
+  // 不可数名词的复数形式在特定语境下合法，NOUN-001 放行
+  var PLURAL_OK = {waters:1,oils:1,foods:1,sugars:1,salts:1,moneys:1,monies:1,works:1,behaviours:1,behaviors:1,maths:1,peoples:1,fishes:1};
+  // 本身无动词用法、复数形式必错的不可数名词（即使被误标为 Verb 也判错）
+  var NOUN_STRICT = {information:1,advice:1,equipment:1,knowledge:1,furniture:1,baggage:1,luggage:1,software:1,homework:1,pollution:1};
   var PHYS_S = /^(news|maths|math|physics|economics|ethics|statistics|politics|linguistics|electronics)$/;
   var SOUND_AN = {hour:1,honest:1,honor:1,honour:1,heir:1};
   var SOUND_A = {university:1,unique:1,united:1,uniform:1,universal:1,user:1,european:1,one:1,once:1,useful:1,union:1,unit:1,use:1};
@@ -402,6 +406,19 @@
     }
   }
 
+  // NOUN-001 不可数名词误用复数形式（informations / advices / equipments ...）
+  function runNoun(tokens, text, issues) {
+    for (var i = 0; i < tokens.length; i++) {
+      var t = tokens[i], w = t.text;
+      if (!/s$/i.test(w) || PLURAL_OK[w]) continue;
+      var base = w.replace(/s$/i, '');
+      if (!UNCOUNTABLE[base] || base === 'news') continue;
+      var nounOnly = hasTag(t, 'Noun') && !hasAnyTag(t, ['Verb']);
+      if (!nounOnly && !NOUN_STRICT[base]) continue; // 排除 works/progresses 等动词；无动词用法的错形仍需判出
+      addIssue(issues, { ruleId:'NOUN-001', category:'noun', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'"' + base + '" 是不可数名词，不能使用复数形式', suggestion:base });
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -411,6 +428,7 @@
       runTen(tokens, text, issues);
       runSva(tokens, text, issues);
       runVerb(tokens, text, issues);
+      runNoun(tokens, text, issues);
     }
     return issues;
   }
