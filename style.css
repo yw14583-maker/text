@@ -350,9 +350,30 @@ textarea:focus {
 .score-issues li { margin-bottom: 5px; line-height: 1.5; }
 .score-issues .err { color: var(--rose); }
 .score-issues .warnx { color: var(--amber-deep); }
+.score-issues .susp { color: var(--amber-deep); }
+.score-issues .susp::before { content: "◈ "; color: var(--amber); opacity: .9; }
+.score-issues .suggest { color: var(--muted); }
+.score-issues .suggest::before { content: "✎ "; color: var(--pine); opacity: .7; }
+.score-issues .issue-sug { color: var(--pine); font-size: 12px; margin-left: 6px; }
 .score-empty { color: var(--muted); text-align: center; padding: 8px; }
 
+/* ---------- 语法原文高亮 ---------- */
+.grammar-preview {
+    margin: 12px 2px 4px;
+    padding: 12px 14px;
+    background: #fffdf7;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    font-family: "Georgia", "Times New Roman", ui-monospace, var(--font-body);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--body);
+    white-space: pre-wrap;
+}
+mark.g-err { background: rgba(196, 43, 43, .16); color: #a12828; border-bottom: 1.5px solid #c42b2b; border-radius: 3px; padding: 0 1px; }
+mark.g-susp { background: rgba(196, 142, 43, .16); color: #8a5c17; border-bottom: 1.5px dashed #c48e2b; border-radius: 3px; padding: 0 1px; }
 
+/* ---------- 答案区 ---------- */
 .answer-section {
     margin-top: 26px;
     border-top: 2px dashed var(--line-strong);

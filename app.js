@@ -304,17 +304,7 @@ const PROFILE_CONFIG =Object.freeze({
 
         if ((text.match(/\(/g)||[]).length !== (text.match(/\)/g)||[]).length) issues.push({level:2, msg:'圆括号未配对'});
 
-        
-        const anSound = ['hour','honest','honor','honour','heir'];
-        const aSound  = ['university','unique','united','uniform','universal','user','european','one','once','ufo'];
-        const anRe = /\b(a|an)\s+([A-Za-z]+)/gi;
-        let m;
-        while ((m = anRe.exec(text)) !== null){
-            const art = m[1].toLowerCase(), w = m[2].toLowerCase();
-            const vowelSound = /^[aeiou]/.test(w) ? !aSound.includes(w) : anSound.includes(w);
-            if (art === 'a'  &&  vowelSound) issues.push({level:2, msg:`冠词误用："a ${m[2]}" 应为 "an ${m[2]}"`});
-            if (art === 'an' && !vowelSound) issues.push({level:2, msg:`冠词误用："an ${m[2]}" 应为 "a ${m[2]}"`});
-        }
+// a/an 发音、时态、主谓一致由 GrammarRules 模块处理（见文件末尾）
 
         const raw = text.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g) || [];
         const sentences = raw.map(s=>s.trim()).filter(s=>s.length>0);
@@ -329,6 +319,20 @@ const PROFILE_CONFIG =Object.freeze({
             if (words.length <= 3) issues.push({level:1, msg:`${label}过短（${words.length} 词），可能是残句`});
             else if (!hasVerb(words)) issues.push({level:2, msg:`${label}可能缺少谓语动词`});
         });
+
+        // 接入启发式语法模块（冠词/时态/主谓一致）
+        if (typeof GrammarRules === 'function' || (window.GrammarRules && typeof window.GrammarRules.runAll === 'function')) {
+            const gram = GrammarRules.runAll(text);
+            gram.forEach(g => {
+                const w = g.confidence === 'high' ? 2 : g.confidence === 'mid' ? 1 : 0;
+                issues.push({
+                    level: w,
+                    msg: (g.confidence==='mid' ? '【疑似】' : g.confidence==='low' ? '【建议】' : '') + g.message,
+                    ruleId: g.ruleId, confidence: g.confidence,
+                    start: g.start, end: g.end, suggestion: g.suggestion
+                });
+            });
+        }
 
         return issues;
     }
@@ -355,6 +359,28 @@ const PROFILE_CONFIG =Object.freeze({
 
     function fillColor(ratio){
         return ratio >= 0.8 ? '#27ae60' : ratio >= 0.5 ? '#e67e22' : '#e74c3c';
+    }
+
+    // 在原文中按 start/end 偏移标红高置信错误、琥珀标疑似
+    function highlightErrors(text, issues){
+        if(!issues) return escapeHtml(text);
+        const rs = issues.filter(i=>isFinite(i.start)&&isFinite(i.end)&&i.start>=0&&i.end>i.start&&i.end<=text.length && (i.confidence==='high'||i.confidence==='mid'));
+        if(!rs.length) return escapeHtml(text);
+        rs.sort((a,b)=>a.start-b.start);
+        const merged=[];
+        for(const r of rs){
+            const last=merged[merged.length-1];
+            if(last && r.start<=last.end){ last.end=Math.max(last.end,r.end); last.conf='high'; }
+            else merged.push({start:r.start,end:r.end,conf:r.confidence});
+        }
+        let html='', pos=0;
+        for(const m of merged){
+            html += escapeHtml(text.slice(pos,m.start));
+            html += '<mark class="' + (m.conf==='high'?'g-err':'g-susp') + '">' + escapeHtml(text.slice(m.start,m.end)) + '</mark>';
+            pos=m.end;
+        }
+        html += escapeHtml(text.slice(pos));
+        return html;
     }
 
     function scoreAnswer(){
@@ -395,7 +421,8 @@ const PROFILE_CONFIG =Object.freeze({
 
         renderScorePanel(panel, {
             total: kwScore + grScore + simScore + wcScore,
-            kwScore, missed, grScore, issues, simScore, recall, wcScore, wcMsg
+            kwScore, missed, grScore, issues, simScore, recall, wcScore, wcMsg,
+            preview: highlightErrors(text, issues)
         });
     }
 
@@ -408,6 +435,7 @@ const PROFILE_CONFIG =Object.freeze({
             {label:'词数（20）',      score:r.wcScore,  max:20, tip: r.wcMsg}
         ];
         let html = '<div class="score-total">' + r.total + ' / 100</div><div class="score-grade">' + grade + '（启发式评分，仅供参考）</div>';
+        if (r.preview) html += '<div class="grammar-preview">' + r.preview + '</div>';
         rows.forEach(row => {
             const ratio = row.score / row.max;
             html += '<div class="score-row"><span class="score-label">' + row.label + '</span>'
@@ -417,7 +445,15 @@ const PROFILE_CONFIG =Object.freeze({
         });
         if (r.issues.length){
             html += '<ul class="score-issues">';
-            r.issues.forEach(i => { html += '<li class="' + (i.level >= 3 ? 'err' : 'warnx') + '">' + escapeHtml(i.msg) + '</li>'; });
+            r.issues.forEach(i => {
+                let cls;
+                if (i.confidence === 'mid') cls = 'susp';
+                else if (i.confidence === 'low') cls = 'suggest';
+                else cls = i.level >= 3 ? 'err' : (i.level === 2 ? 'warnx' : 'warnx');
+                let extra = '';
+                if (i.suggestion) extra = '<span class="issue-sug">→ ' + escapeHtml(i.suggestion) + '</span>';
+                html += '<li class="' + cls + '">' + escapeHtml(i.msg) + extra + '</li>';
+            });
             html += '</ul>';
         }
         panel.innerHTML = html;
