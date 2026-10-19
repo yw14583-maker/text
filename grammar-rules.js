@@ -385,6 +385,23 @@
   function singularize(t) { var w = t.text; if (IRREG_S3[w]) return IRREG_S3[w]; if (/[sx]$/i.test(w) || /ch$|sh$|o$/i.test(w)) return w + 'es'; if (/[bcdfghjklmnpqrstvwxz]y$/i.test(w)) return w.slice(0, -1) + 'ies'; return w + 's'; }
   function pluralStrip(t) { var w = t.text.toLowerCase(); var base = IRREG_BASE[w]; if (base) return base; if (/ies$/i.test(w)) return w.slice(0, -3) + 'y'; if (/ches$|shes$|xes$|zes$|sses$/i.test(w)) return w.slice(0, -2); return w.replace(/s$/i, ''); }
 
+  // VERB-001/002 be 动词搭配错误：be + 动词原形 / be + been
+  function runVerb(tokens, text, issues) {
+    for (var i = 0; i + 1 < tokens.length; i++) {
+      var curr = tokens[i], next = tokens[i + 1];
+      if (!/^(am|is|are|was|were)$/i.test(curr.text)) continue;
+      // VERB-002: be + been（was/were/is/are been 均为错误，完成时须 has/have/had been）
+      if (next.text === 'been') {
+        addIssue(issues, { ruleId:'VERB-002', category:'verb', confidence:'high', start:curr.start, end:next.end, errorText:text.slice(curr.start, next.end), message:'am/is/are/was/were 不能与 been 连用，完成时请用 has/have/had been', suggestion:'has been / had been' });
+        continue;
+      }
+      // VERB-001: be + 动词原形（Bare Infinitive），如 I am agree / He is go
+      if (hasTag(next, 'Infinitive') && !hasAnyTag(next, ['Gerund', 'Adjective', 'PastTense']) && !PREPS[next.text]) {
+        addIssue(issues, { ruleId:'VERB-001', category:'verb', confidence:'high', start:curr.start, end:next.end, errorText:text.slice(curr.start, next.end), message:'be 动词不能直接接动词原形，应改用实义动词或 be 的正确形式（be doing / be + 形容词）', suggestion:curr.raw + ' ' + next.raw + ' → ' + next.raw });
+      }
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -393,6 +410,7 @@
     if (tokens.some(function (t) { return /[a-z]/i.test(t.text); })) {
       runTen(tokens, text, issues);
       runSva(tokens, text, issues);
+      runVerb(tokens, text, issues);
     }
     return issues;
   }
