@@ -23,9 +23,12 @@
   var MEASURE_WORDS = {cup:1,glass:1,piece:1,bottle:1,box:1,group:1,lot:1,number:1,variety:1,range:1,kind:1,type:1,bit:1,loaf:1,slice:1,bowl:1,bag:1,packet:1,pair:1,set:1,liter:1,litre:1,kilo:1,grain:1,drop:1};
   var UNIQUE_NOUNS = {sun:1,moon:1,world:1,internet:1};
   var COUNTRY_OK = {'united states':1,'united kingdom':1,us:1,usa:1,uk:1};
+  // 官方/惯用名称本就带 the（避免 ART-006 误判）
+  var THE_OK = {netherlands:1,philippines:1,maldives:1,seychelles:1,bahamas:1,alps:1,andes:1,himalayas:1,rockies:1};
   var INDEF = {everyone:1,everybody:1,someone:1,somebody:1,anyone:1,anybody:1,nobody:1,nothing:1,everything:1};
   var COLLECTIVE = {family:1,team:1,class:1,group:1,committee:1,staff:1,audience:1,government:1,public:1,crew:1};
   var ORDINALS = {first:1,second:1,third:1,fourth:1,fifth:1,sixth:1,seventh:1,eighth:1,ninth:1,tenth:1};
+  var SPORTS = {football:1,basketball:1,soccer:1,baseball:1,tennis:1,golf:1,chess:1,volleyball:1,badminton:1,swimming:1,skiing:1,hockey:1,rugby:1,cricket:1};
   var PHYS_S = /^(news|maths|math|physics|economics|ethics|statistics|politics|linguistics|electronics)$/;
   var SOUND_AN = {hour:1,honest:1,honor:1,honour:1,heir:1};
   var SOUND_A = {university:1,unique:1,united:1,uniform:1,universal:1,user:1,european:1,one:1,once:1,useful:1,union:1,unit:1,use:1};
@@ -33,6 +36,8 @@
   var IRREG_PP = {been:1,seen:1,gone:1,done:1,met:1,taken:1,written:1,broken:1,chosen:1,spoken:1,fell:1,known:1,driven:1,eaten:1,run:1,come:1,become:1,found:1,held:1,kept:1,left:1,made:1,said:1,told:1,thought:1,shown:1,built:1,bought:1,caught:1,bring:1,brought:1,felt:1,heard:1,hit:1,understood:1,put:1,read:1,risen:1,sent:1,sung:1,stood:1,taught:1,won:1,been:1};
   // 一般现在时第三单的不规则形式
   var IRREG_S3 = {be:'is',have:'has',has:'has',do:'does',does:'does',go:'goes',watch:'watches',teach:'teaches',reach:'reaches',catch:'catches',pass:'passes',fix:'fixes',box:'boxes'};
+  // 复数谓语还原为原形的不规则映射
+  var IRREG_BASE = {is:'be',are:'be',was:'be',were:'be',has:'have',does:'do'};
   var INNER_WORDS = {'together with':1,'along with':1,'as well as':1,including:1};
   var DETERMINERS = {the:1,a:1,an:1,this:1,that:1,these:1,those:1,my:1,your:1,his:1,her:1,its:1,our:1,their:1,some:1,any:1,each:1,every:1,no:1,both:1,all:1,several:1,'another':1,'other':1};
 
@@ -64,7 +69,10 @@
 
   function tok(tokens, i) { return i >= 0 && i < tokens.length ? tokens[i] : null; }
   function addIssue(issues, o) {
-    for (var i = 0; i < issues.length; i++) if (issues[i].ruleId === o.ruleId) return;
+    // 仅去掉同一规则在同一位置的重复提示；同一规则在不同位置可分别报出
+    for (var i = 0; i < issues.length; i++) {
+      if (issues[i].ruleId === o.ruleId && issues[i].start === (o.start || 0) && issues[i].end === (o.end || 0)) return;
+    }
     issues.push({ start: o.start || 0, end: o.end || 0, errorText: o.errorText || '', message: o.message, suggestion: o.suggestion || '', ruleId: o.ruleId, category: o.category, confidence: o.confidence });
   }
   // 主语词性判定
@@ -76,17 +84,28 @@
     if (isNoun(t) && !isProperNoun(t)) { var p = isPlural(t); return { plural: p, third: !p, name: w }; }
     return null;
   }
-  // 取动词左边最近的主体（跳过副词/限定词/插入语），遇 modal/to/连接词返回 null
+  var PREPS = {of:1,in:1,on:1,at:1,by:1,for:1,with:1,about:1,from:1,into:1,after:1,before:1,between:1,under:1,during:1,through:1,without:1,along:1,across:1,among:1,against:1,around:1,over:1,up:1,down:1,as:1,than:1};
+  // 判断 tokens[k] 是否是介词短语的宾语（向左越过限定词能找到介词）
+  function isPPObject(tokens, k) {
+    for (var j = k - 1; j >= Math.max(0, k - 3); j--) {
+      var t = tokens[j];
+      if (hasTag(t, 'Preposition') || PREPS[t.text]) return true;
+      if (hasTag(t, 'Determiner')) continue;
+      break;
+    }
+    return false;
+  }
+  // 取动词左边最近的主体（跳过副词/限定词/介词短语宾语），遇 modal/连接词返回 null
   function subjectBefore(tokens, idx) {
     for (var k = idx - 1; k >= 0; k--) {
       var t = tokens[k];
-      if (t.text === ',' || t.text === 'and' || t.text === 'or' || t.text === 'but' || t.text === 'to') return null;
+      if (t.text === ',' || t.text === ';' || t.text === '.' || t.text === 'and' || t.text === 'or' || t.text === 'but' || t.text === 'then' || t.text === 'to') return null;
+      if (MODALS[t.text]) return null;
       if (hasAnyTag(t, ['Adverb'])) continue;
       if (t.text === 'not' || t.text === 'also' || t.text === 'always' || t.text === 'often' || t.text === 'never' || t.text === 'usually' || t.text === 'however') continue;
-      if (MODALS[t.text]) return null;
-      if (isDeterminer(t)) return null;
+      if (isDeterminer(t)) continue;
       var cl = classifySubject(t);
-      return cl;
+      if (cl) { if (isPPObject(tokens, k)) continue; return cl; }
     }
     return null;
   }
@@ -142,9 +161,10 @@
       // 触发条件：前一词为动词或介词（宾语/介词短语位置，避免主语位置误报）
       if (!hasAnyTag(prev, ['Verb']) && !hasTag(prev, 'Preposition')) continue;
       if (/^(school|bed|work|home|hospital|prison|church|foot|hand|heart|top|bottom|breakfast|lunch|dinner|once|twice|night)$/.test(t.text)) continue;
+      if (SPORTS[t.text]) continue; // play football/basketball 等运动名词不加冠词
       // 习语局部上下文放行（go to school / at home / by bus ...）
       var ctx = text.slice(Math.max(0, t.start - 18), t.end + 4).toLowerCase();
-      if (/(go to school|go to work|go to bed|at home|at work|by bus|by car|by train|by plane|by bike|to school|to work|in bed|at night|on foot|at lunch)/i.test(ctx)) continue;
+      if (/(go to school|go to work|go to bed|at home|at work|by bus|by car|by train|by plane|by bike|to school|to work|in bed|at night|on foot|at lunch|played?\s+(football|basketball|soccer|baseball|tennis|golf|chess|volleyball|badminton))/i.test(ctx)) continue;
       addIssue(issues, { ruleId:'ART-002', category:'article', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'单数可数名词 "' + t.raw + '" 前需要冠词(a/an/the)或限定词', suggestion:'the/a ' + t.raw });
     }
     // ART-004 抽象固定搭配误用 the（中）
@@ -158,7 +178,7 @@
       if (!UNIQUE_NOUNS[tokens[u].text]) continue;
       var pb = tok(tokens, u - 1);
       var pt = pb ? pb.text : '';
-      if (pt === 'the' || pt === 'a' || pt === 'an' || pt === 'on' || pt === 'of' || pt === 'in') continue;
+      if (pt === 'the' || pt === 'a' || pt === 'an') continue; // 仅确指限定词放行；in/of/on world 仍应加 the
       addIssue(issues, { ruleId:'ART-005', category:'article', confidence:'high', start:tokens[u].start, end:tokens[u].end, errorText:tokens[u].raw, message:'sun/moon/world/internet 等独一无二事物前需加定冠词 the', suggestion:'the ' + tokens[u].raw });
     }
     // ART-006 专有名词错误加 the
@@ -167,6 +187,7 @@
       var nm = tokens[p + 1];
       if (!isProperNoun(nm)) continue;
       if (COUNTRY_OK[nm.text]) continue;
+      if (THE_OK[nm.text]) continue; // 官方名称本就带 the（Netherlands/Philippines 等）
       if (PHYS_S.test(nm.text) || UNCOUNTABLE[nm.text]) continue; // news/physics 等常见专有误标放行
       addIssue(issues, { ruleId:'ART-006', category:'article', confidence:'high', start:tokens[p].start, end:nm.end, errorText:text.slice(tokens[p].start, nm.end), message:'人名/单个国家名称前不加 the，应直接写 "' + nm.raw + '"', suggestion:nm.raw });
     }
@@ -221,7 +242,7 @@
         var tf = tokens[f];
         if (!hasTag(tf, 'PastTense')) continue;
         if (verbBlocked(tokens, f)) continue;
-        addIssue(issues, { ruleId:'TEN-005', category:'tense', confidence:'high', start:tf.start, end:tf.end, errorText:tf.raw, message:'tomorrow/next week 是将来时间，谓语不能使用过去式', suggestion:'will ' + tf.raw });
+        addIssue(issues, { ruleId:'TEN-005', category:'tense', confidence:'high', start:tf.start, end:tf.end, errorText:tf.raw, message:'tomorrow/next week 是将来时间，谓语不能使用过去式', suggestion:'will ' + (PAST_BASE[tf.text] || tf.text) });
         break;
       }
     }
@@ -299,8 +320,13 @@
     var m3r;
     while ((m3r = m3.exec(text)) !== null) {
       var head3 = m3r[1].toLowerCase();
-      if (/[sx]$/.test(head3)) continue;
-      addIssue(issues, { ruleId:'SVA-003', category:'sva', confidence:'mid', start:m3r.index, end:m3r.index + m3r[0].length, errorText:m3r[0], message:'together with/along with/as well as 属插入语，谓语单复数由真正主语（' + head3 + '）决定', suggestion:m3r[3] === 'are' ? 'is' : 'was' });
+      var verb3 = (m3r[2] || '').toLowerCase();
+      var headPlur = /[sx]$/.test(head3) || head3 === 'they' || head3 === 'we' || head3 === 'these' || head3 === 'those';
+      var sug3 = '';
+      if (headPlur && (verb3 === 'is' || verb3 === 'was')) sug3 = verb3 === 'is' ? 'are' : 'were';
+      else if (!headPlur && (verb3 === 'are' || verb3 === 'were')) sug3 = verb3 === 'are' ? 'is' : 'was';
+      if (!sug3) continue; // 动词与真正主语一致，不报
+      addIssue(issues, { ruleId:'SVA-003', category:'sva', confidence:'mid', start:m3r.index, end:m3r.index + m3r[0].length, errorText:m3r[0], message:'together with/along with/as well as 属插入语，谓语单复数由真正主语（' + head3 + '）决定', suggestion:sug3 });
     }
     // SVA-007 either...or / neither...nor 就近
     var m7 = /((?:neither|either)\s+\w+\s+(?:nor|or)\s+)(\w+)\s+(is|are|was|were)/i;
@@ -333,8 +359,9 @@
     }
   }
 
+  var PAST_BASE = {went:'go',saw:'see',had:'have',did:'do',was:'be',were:'be',made:'make',took:'take',came:'come',got:'get',gave:'give',said:'say',told:'tell',thought:'think',found:'find',left:'leave',met:'meet',knew:'know',became:'become',held:'hold',kept:'keep',built:'build',bought:'buy',caught:'catch',taught:'teach',won:'win',broke:'break',wrote:'write',read:'read',ran:'run',felt:'feel',heard:'hear',sent:'send',put:'put',stood:'stand',understood:'understand',drove:'drive',ate:'eat',spoke:'speak',chose:'choose',brought:'bring',spent:'spend',showed:'show',slept:'sleep',drank:'drink',swam:'swim',drew:'draw',flew:'fly',threw:'throw',wore:'wear'};
   function singularize(t) { var w = t.text; if (IRREG_S3[w]) return IRREG_S3[w]; if (/[sx]$/i.test(w) || /ch$|sh$|o$/i.test(w)) return w + 'es'; if (/[bcdfghjklmnpqrstvwxz]y$/i.test(w)) return w.slice(0, -1) + 'ies'; return w + 's'; }
-  function pluralStrip(t) { var w = t.text; if (/ies$/i.test(w)) return w.slice(0, -3) + 'y'; return w.replace(/s$/i, ''); }
+  function pluralStrip(t) { var w = t.text.toLowerCase(); var base = IRREG_BASE[w]; if (base) return base; if (/ies$/i.test(w)) return w.slice(0, -3) + 'y'; if (/ches$|shes$|xes$|zes$|sses$/i.test(w)) return w.slice(0, -2); return w.replace(/s$/i, ''); }
 
   function runAll(text) {
     if (!text) return [];
