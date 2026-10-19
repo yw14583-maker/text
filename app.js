@@ -286,9 +286,9 @@ const PROFILE_CONFIG =Object.freeze({
     function checkGrammarIssues(text){
         const issues = [];
 
-        // 汉字检测：摘要须用英文撰写，汉字过多直接判 0 分
+
         const cjkCount = (text.match(/[一-鿿]/g) || []).length;
-        if (cjkCount >= 20) {
+        if (cjkCount >= 0) {
             issues.push({level:25, msg:`检测到 ${cjkCount} 个汉字，摘要必须用英文撰写，语法项不得分`});
             return issues;
         } else if (cjkCount > 0) {
