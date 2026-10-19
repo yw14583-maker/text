@@ -17,7 +17,7 @@
   // 复数后缀启发式：s/x 结尾且非常见单数名词/不可数名词，视为复数
   function looksPlural(w) { w = (w || '').toLowerCase(); if (!/[sx]$/i.test(w)) return false; if (PHYS_S.test(w)) return false; if (UNCOUNTABLE[w]) return false; return true; }
 
-  var UNCOUNTABLE = {water:1,milk:1,juice:1,oil:1,rice:1,bread:1,sugar:1,salt:1,food:1,money:1,information:1,knowledge:1,advice:1,research:1,evidence:1,progress:1,news:1,furniture:1,equipment:1,baggage:1,luggage:1,traffic:1,weather:1,work:1,software:1,pollution:1,nature:1,literature:1,music:1,education:1,math:1,mathematics:1,physics:1,behaviour:1,behavior:1,'homework':1,'meat':1,'beef':1,'pork':1,'chicken':1,'fish':1,'toast':1};
+  var UNCOUNTABLE = {water:1,milk:1,juice:1,oil:1,rice:1,bread:1,sugar:1,salt:1,food:1,money:1,information:1,knowledge:1,advice:1,research:1,evidence:1,progress:1,news:1,furniture:1,equipment:1,baggage:1,luggage:1,traffic:1,weather:1,work:1,software:1,pollution:1,nature:1,literature:1,music:1,education:1,math:1,mathematics:1,physics:1,behaviour:1,behavior:1,'homework':1,'meat':1,'beef':1,'pork':1,'chicken':1,'fish':1,'toast':1,noise:1,damage:1,feedback:1,transport:1,transportation:1,accommodation:1,advertising:1,employment:1};
   // a/an 之后不应误判为缺限定词单数名词的词（代词宾格、地点/时间副词、指示词等）
   var NOUN_SKIP = {him:1,her:1,them:1,us:1,me:1,you:1,here:1,there:1,now:1,then:1,it:1,this:1,that:1,these:1,those:1,each:1,every:1};
   var MEASURE_WORDS = {cup:1,glass:1,piece:1,bottle:1,box:1,group:1,lot:1,number:1,variety:1,range:1,kind:1,type:1,bit:1,loaf:1,slice:1,bowl:1,bag:1,packet:1,pair:1,set:1,liter:1,litre:1,kilo:1,grain:1,drop:1};
@@ -42,6 +42,8 @@
   // 固定搭配：错误搭配 → 正确形式（'' 表示去掉该介词）
   var V_PREP_RULE = {'depend of':'on','reply of':'to','arrive to':'at','discuss about':'','emphasize on':''};
   var N_PREP_RULE = {'solution of':'to','reason of':'for','answer of':'to','key of':'to'};
+  // 比较级词表：其后的 then 应为 than
+  var COMPARATIVE = {more:1,less:1,fewer:1,greater:1,higher:1,lower:1,bigger:1,smaller:1,better:1,worse:1,other:1,rather:1,earlier:1,later:1,longer:1,shorter:1,larger:1,faster:1,slower:1,older:1,younger:1,easier:1,stronger:1,weaker:1,cheaper:1,richer:1,poorer:1,harsher:1};
   var PHYS_S = /^(news|maths|math|physics|economics|ethics|statistics|politics|linguistics|electronics)$/;
   var SOUND_AN = {hour:1,honest:1,honor:1,honour:1,heir:1};
   var SOUND_A = {university:1,unique:1,united:1,uniform:1,universal:1,user:1,european:1,one:1,once:1,useful:1,union:1,unit:1,use:1};
@@ -178,7 +180,7 @@
       if (SPORTS[t.text]) continue; // play football/basketball 等运动名词不加冠词
       // 习语局部上下文放行（go to school / at home / by bus ...）
       var ctx = text.slice(Math.max(0, t.start - 18), t.end + 4).toLowerCase();
-      if (/(go to school|go to work|go to bed|at home|at work|by bus|by car|by train|by plane|by bike|to school|to work|in bed|at night|on foot|at lunch|played?\s+(football|basketball|soccer|baseball|tennis|golf|chess|volleyball|badminton))/i.test(ctx)) continue;
+      if (/(go to school|go to work|go to bed|at home|at work|by bus|by car|by train|by plane|by bike|to school|to work|in bed|at night|on foot|at lunch|take part|took part|take care|took care|pay attention|played?\s+(football|basketball|soccer|baseball|tennis|golf|chess|volleyball|badminton))/i.test(ctx)) continue;
       addIssue(issues, { ruleId:'ART-002', category:'article', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'单数可数名词 "' + t.raw + '" 前需要冠词(a/an/the)或限定词', suggestion:'the/a ' + t.raw });
     }
     // ART-004 抽象固定搭配误用 the（中）
@@ -200,6 +202,7 @@
       if (tokens[p].text !== 'the') continue;
       var nm = tokens[p + 1];
       if (COMMON_NOUN_WHITELIST[nm.text]) continue; // the police/government/public... 属正常用法，放行
+      if (hasTag(nm, 'Organization')) continue; // 机构/组织名词（company/university...）被误标专有，放行
       if (!isProperNoun(nm)) continue;
       if (COUNTRY_OK[nm.text]) continue;
       if (THE_OK[nm.text]) continue; // 官方名称本就带 the（Netherlands/Philippines 等）
@@ -361,6 +364,7 @@
     // SVA-001/002 一般现在时主谓一致
     for (var v = 0; v < n; v++) {
       var tv = tokens[v];
+      if (!tv.text) continue; // 跳过缩写产生的空 token（it's / they're 等）
       if (MODALS[tv.text]) continue;
       if (PREPS[tv.text] || hasTag(tv, 'Preposition')) continue; // 介词不做谓语（防 compromise 误标 in/on...）
       if (!hasTag(tv, 'PresentTense') && !hasTag(tv, 'Verb')) continue;
@@ -490,6 +494,51 @@
     while ((mr = reSo.exec(text)) !== null) { var si = mr.index + mr[0].toLowerCase().lastIndexOf('so'); addIssue(issues, { ruleId:'COLL-003', category:'collocation', confidence:'mid', start:si, end:si + 2, errorText:'so', message:'because 与 so 不能同时使用，去掉 so', suggestion:'去掉 so' }); }
   }
 
+  // CONF-001~005 易混词：its/it's、their/there/they're、then/than、affect/effect、weather/whether
+  function nextReal(tokens, i) { for (var j = i + 1; j < tokens.length; j++) if (tokens[j].text) return tokens[j]; return null; }
+  function runConfuse(tokens, text, issues) {
+    var n = tokens.length;
+    for (var i = 0; i < n; i++) {
+      var t = tokens[i], w = t.text, prev = i > 0 ? tokens[i - 1] : null, nx = nextReal(tokens, i);
+      // its → it's（后接冠词/be动词/动名词/程度副词时）
+      if (w === 'its' && nx) {
+        if (isDeterminer(nx) || hasTag(nx, 'Gerund') || /^(is|are|was|were|has|have|had)$/.test(nx.text) || (/^(very|really|quite|so|too|also|just|still)$/.test(nx.text)))
+          addIssue(issues, { ruleId:'CONF-001', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'its 是物主代词，此处应为 it\'s（it is / it has 的缩写）', suggestion:"it's" });
+      }
+      // it's → its（后接名词，或后接非谓语/非助词的实义动词，如 it's tail）
+      if (w === "it's" && nx) {
+        var itsNoun = hasTag(nx, 'Noun') && !hasAnyTag(nx, ['Verb', 'Pronoun']);
+        var itsVerb = hasTag(nx, 'Verb') && !hasTag(nx, 'Gerund') && !hasTag(nx, 'PastTense') && !/^(is|are|am|was|were|has|have|had|do|does|did|can|could|may|might|must|shall|should|will|would|be)$/.test(nx.text);
+        if (itsNoun || itsVerb)
+          addIssue(issues, { ruleId:'CONF-001', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'it\'s 是 it is 的缩写，此处表示所属应用 its', suggestion:'its' });
+      }
+      // their → there / they're
+      if (w === 'their' && nx) {
+        if (/^(is|are|was|were)$/.test(nx.text)) addIssue(issues, { ruleId:'CONF-002', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'their 是物主代词，there is/are 表存在，此处应为 there', suggestion:'there' });
+        else if (hasTag(nx, 'Gerund')) addIssue(issues, { ruleId:'CONF-002', category:'confusable', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'【疑似】此处可能应为 they\'re（they are）', suggestion:"they're" });
+      }
+      // then → than（前为比较级）
+      if (w === 'then' && prev && COMPARATIVE[prev.text])
+        addIssue(issues, { ruleId:'CONF-003', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'比较级后应用 than 表示比较，不能用 then', suggestion:'than' });
+      // than → then（前为 and/but/or，表时间）
+      if (w === 'than' && prev && /^(and|but|or)$/.test(prev.text))
+        addIssue(issues, { ruleId:'CONF-003', category:'confusable', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'【疑似】此处表时间先后，应用 then 而非 than', suggestion:'then' });
+      // affect → effect（前为限定词/物主代词，作名词）
+      if (w === 'affect' && prev && (isDeterminer(prev) || hasAnyTag(prev, ['Possessive'])))
+        addIssue(issues, { ruleId:'CONF-004', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'affect 是动词，名词“影响/效果”应为 effect', suggestion:'effect' });
+      // weather → whether
+      if (w === 'weather') {
+        if (tokens[i + 1] && tokens[i + 1].text === 'or' && tokens[i + 2] && tokens[i + 2].text === 'not')
+          addIssue(issues, { ruleId:'CONF-005', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'weather 是名词“天气”，表示“是否”应用 whether', suggestion:'whether' });
+        else if (nx && nx.text === 'to' && tokens[i + 2] && hasTag(tokens[i + 2], 'Infinitive'))
+          addIssue(issues, { ruleId:'CONF-005', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'weather 是名词“天气”，表示“是否”应用 whether', suggestion:'whether' });
+      }
+      // whether → weather（前为限定词，作名词“天气”）
+      if (w === 'whether' && prev && isDeterminer(prev))
+        addIssue(issues, { ruleId:'CONF-005', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'whether 是连词“是否”，此处指“天气”应用 weather', suggestion:'weather' });
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -502,6 +551,7 @@
       runNoun(tokens, text, issues);
       runNonfin(tokens, text, issues);
       runColl(tokens, text, issues);
+      runConfuse(tokens, text, issues);
     }
     return issues;
   }
