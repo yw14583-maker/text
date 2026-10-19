@@ -582,6 +582,29 @@
     }
   }
 
+  // FRAG-001 残句：以从属连词开头却无主句
+  function runFrag(tokens, text, issues) {
+    var reS = /[^.!?]+[.!?]+|[^.!?]+$/g, m;
+    while ((m = reS.exec(text)) !== null) {
+      var sStart = m.index, sEnd = m.index + m[0].length, s = m[0];
+      var words = (s.match(/[A-Za-z']+/g) || []).map(function (w) { return w.toLowerCase(); });
+      if (words.length < 3) continue;
+      var head = words[0];
+      var isSub = /^(because|although|though|whereas|since|while|unless|until|when|whenever|wherever|if)$/.test(head) || (head === 'even' && words[1] === 'though');
+      if (!isSub) continue;
+      if (head === 'because' && words[1] === 'of') continue; // because of 是介词短语
+      if (s.indexOf(',') !== -1) continue; // 有逗号，通常已含主句
+      var fin = 0;
+      for (var k = 0; k < tokens.length; k++) {
+        var tk = tokens[k];
+        if (tk.start < sStart || tk.start >= sEnd) continue;
+        if (hasTag(tk, 'Verb') && (hasTag(tk, 'PresentTense') || hasTag(tk, 'PastTense')) && !hasTag(tk, 'Gerund')) fin++;
+      }
+      if (fin >= 2) continue; // 已含主句（从句动词 + 主句动词）
+      addIssue(issues, { ruleId:'FRAG-001', category:'fragment', confidence:'high', start:sStart, end:sEnd, errorText:s.trim().slice(0, 40), message:'该句以从属连词（' + head + '）开头却缺少主句，属残句，需补出完整主句', suggestion:'补出主句，或与上一句合并' });
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -598,6 +621,7 @@
       runComp(tokens, text, issues);
       runClause(tokens, text, issues);
       runRed(tokens, text, issues);
+      runFrag(tokens, text, issues);
     }
     return issues;
   }
