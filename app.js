@@ -288,6 +288,15 @@ const PROFILE_CONFIG =Object.freeze({
     function checkGrammarIssues(text){
         const issues = [];
 
+        // 汉字检测：摘要须用英文撰写，汉字过多直接判 0 分
+        const cjkCount = (text.match(/[一-鿿]/g) || []).length;
+        if (cjkCount >= 20) {
+            issues.push({level:25, msg:`检测到 ${cjkCount} 个汉字，摘要必须用英文撰写，语法项不得分`});
+            return issues;
+        } else if (cjkCount > 0) {
+            issues.push({level:5, msg:`文中混入 ${cjkCount} 个汉字，请改为英文表达`});
+        }
+
         const zhPunc = text.match(/[，。；：！？（）【】“”‘’]/g);
         if (zhPunc) issues.push({level:3, msg:`使用了中文标点（${[...new Set(zhPunc)].join(' ')}），英文写作请用半角标点`});
 
