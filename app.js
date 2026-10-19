@@ -286,7 +286,6 @@ const PROFILE_CONFIG =Object.freeze({
     function checkGrammarIssues(text){
         const issues = [];
 
-        // 汉字检测：摘要须用英文撰写，出现任何汉字语法项即判 0 分
         const cjkCount = (text.match(/[一-鿿]/g) || []).length;
         if (cjkCount > 0) {
             issues.push({level:25, msg:`检测到 ${cjkCount} 个汉字，摘要必须用英文撰写，语法项不得分`});
@@ -305,7 +304,7 @@ const PROFILE_CONFIG =Object.freeze({
 
         if ((text.match(/\(/g)||[]).length !== (text.match(/\)/g)||[]).length) issues.push({level:2, msg:'圆括号未配对'});
 
-        // a / an 误用（含 hour、university 等常见例外）
+        
         const anSound = ['hour','honest','honor','honour','heir'];
         const aSound  = ['university','unique','united','uniform','universal','user','european','one','once','ufo'];
         const anRe = /\b(a|an)\s+([A-Za-z]+)/gi;
