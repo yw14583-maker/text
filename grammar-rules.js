@@ -16,8 +16,10 @@
   function isSingular(t) { return hasTag(t, 'Singular'); }
   // 复数后缀启发式：s/x 结尾且非常见单数名词/不可数名词，视为复数
   function looksPlural(w) { w = (w || '').toLowerCase(); if (!/[sx]$/i.test(w)) return false; if (PHYS_S.test(w)) return false; if (UNCOUNTABLE[w]) return false; return true; }
+  // 可数名词复数：带 Plural 标签且非不可数/s 结尾单数
+  function isCountPlural(t) { return hasTag(t, 'Plural') && !UNCOUNTABLE[t.text] && !PHYS_S.test(t.text); }
 
-  var UNCOUNTABLE = {water:1,milk:1,juice:1,oil:1,rice:1,bread:1,sugar:1,salt:1,food:1,money:1,information:1,knowledge:1,advice:1,research:1,evidence:1,progress:1,news:1,furniture:1,equipment:1,baggage:1,luggage:1,traffic:1,weather:1,work:1,software:1,pollution:1,nature:1,literature:1,music:1,education:1,math:1,mathematics:1,physics:1,behaviour:1,behavior:1,'homework':1,'meat':1,'beef':1,'pork':1,'chicken':1,'fish':1,'toast':1,noise:1,damage:1,feedback:1,transport:1,transportation:1,accommodation:1,advertising:1,employment:1};
+  var UNCOUNTABLE = {water:1,milk:1,juice:1,oil:1,rice:1,bread:1,sugar:1,salt:1,food:1,money:1,information:1,knowledge:1,advice:1,research:1,evidence:1,progress:1,news:1,furniture:1,equipment:1,baggage:1,luggage:1,traffic:1,weather:1,work:1,software:1,pollution:1,nature:1,literature:1,music:1,education:1,math:1,mathematics:1,physics:1,behaviour:1,behavior:1,'homework':1,'meat':1,'beef':1,'pork':1,'chicken':1,'fish':1,'toast':1,noise:1,damage:1,feedback:1,transport:1,transportation:1,accommodation:1,advertising:1,employment:1,rain:1,snow:1,warmth:1,darkness:1,oxygen:1,hydrogen:1};
   // a/an 之后不应误判为缺限定词单数名词的词（代词宾格、地点/时间副词、指示词等）
   var NOUN_SKIP = {him:1,her:1,them:1,us:1,me:1,you:1,here:1,there:1,now:1,then:1,it:1,this:1,that:1,these:1,those:1,each:1,every:1};
   var MEASURE_WORDS = {cup:1,glass:1,piece:1,bottle:1,box:1,group:1,lot:1,number:1,variety:1,range:1,kind:1,type:1,bit:1,loaf:1,slice:1,bowl:1,bag:1,packet:1,pair:1,set:1,liter:1,litre:1,kilo:1,grain:1,drop:1};
@@ -38,12 +40,16 @@
   // 后接不定式(to do)的常见动词：漏 to 时报错
   var TO_VERBS = {want:1,hope:1,decide:1,plan:1,expect:1,agree:1,refuse:1,pretend:1,offer:1,learn:1,manage:1,choose:1,afford:1,attempt:1,intend:1,deserve:1,promise:1};
   // 动名词还原为原形时的补 e 例外
-  var GERUND_E = {mak:'make',tak:'take',us:'use',writ:'write',driv:'drive',hav:'have',giv:'give',com:'come',bec:'become',mov:'move',choos:'choose',los:'lose',car:'care',shar:'share',hop:'hope',danc:'dance',fac:'face',decid:'decide',improv:'improve',includ:'include',provid:'provide',achiev:'achieve',compar:'compare',creat:'create',increas:'increase',reduc:'reduce',produc:'produce',introduc:'introduce',agre:'agree',manag:'manage',prepar:'prepare',explor:'explore',requir:'require',deserv:'deserve',refus:'refuse',pretend:'pretend',arriv:'arrive'};
+  var GERUND_E = {mak:'make',tak:'take',us:'use',writ:'write',driv:'drive',hav:'have',giv:'give',com:'come',bec:'become',mov:'move',choos:'choose',los:'lose',car:'care',shar:'share',hop:'hope',danc:'dance',fac:'face',decid:'decide',improv:'improve',includ:'include',provid:'provide',achiev:'achieve',compar:'compare',creat:'create',increas:'increase',reduc:'reduce',produc:'produce',introduc:'introduce',agre:'agree',manag:'manage',prepar:'prepare',explor:'explore',requir:'require',deserv:'deserve',refus:'refuse',pretend:'pretend',arriv:'arrive',advanc:'advance',merg:'merge',revers:'reverse',combin:'combine'};
   // 固定搭配：错误搭配 → 正确形式（'' 表示去掉该介词）
   var V_PREP_RULE = {'depend of':'on','reply of':'to','arrive to':'at','discuss about':'','emphasize on':''};
   var N_PREP_RULE = {'solution of':'to','reason of':'for','answer of':'to','key of':'to'};
   // 比较级词表：其后的 then 应为 than
-  var COMPARATIVE = {more:1,less:1,fewer:1,greater:1,higher:1,lower:1,bigger:1,smaller:1,better:1,worse:1,other:1,rather:1,earlier:1,later:1,longer:1,shorter:1,larger:1,faster:1,slower:1,older:1,younger:1,easier:1,stronger:1,weaker:1,cheaper:1,richer:1,poorer:1,harsher:1};
+  var COMPARATIVE = {more:1,less:1,fewer:1,greater:1,higher:1,lower:1,bigger:1,smaller:1,better:1,worse:1,other:1,rather:1,earlier:1,later:1,longer:1,shorter:1,larger:1,faster:1,slower:1,older:1,younger:1,easier:1,stronger:1,weaker:1,cheaper:1,richer:1,poorer:1,harsher:1,harder:1,deeper:1,wider:1,heavier:1,closer:1,nicer:1,safer:1};
+  // 最高级词表：其前的 most 冗余
+  var SUPERLATIVE = {best:1,worst:1,fastest:1,biggest:1,smallest:1,largest:1,highest:1,lowest:1,greatest:1,easiest:1,hardest:1,strongest:1,cheapest:1,richest:1,poorest:1,oldest:1,youngest:1,longest:1,shortest:1,earliest:1,latest:1,deepest:1,widest:1,heaviest:1,closest:1,nicest:1,safest:1};
+  // 语义重复（冗余）搭配：错误 → 精简后
+  var REDUNDANT = {'repeat again':'repeat','return back':'return','advance forward':'advance','past history':'history','new innovation':'innovation','free gift':'gift','basic fundamentals':'fundamentals','unexpected surprise':'surprise','reverse back':'reverse','merge together':'merge','still remains':'remains','mutual cooperation':'cooperation','repeat once again':'repeat'};
   var PHYS_S = /^(news|maths|math|physics|economics|ethics|statistics|politics|linguistics|electronics)$/;
   var SOUND_AN = {hour:1,honest:1,honor:1,honour:1,heir:1};
   var SOUND_A = {university:1,unique:1,united:1,uniform:1,universal:1,user:1,european:1,one:1,once:1,useful:1,union:1,unit:1,use:1};
@@ -539,6 +545,43 @@
     }
   }
 
+  // CMP 双重比较级/最高级；QUA 数量词误用
+  function runComp(tokens, text, issues) {
+    var n = tokens.length;
+    for (var i = 0; i + 1 < n; i++) {
+      var t = tokens[i], w = t.text, nx = tokens[i + 1], n2 = tokens[i + 2];
+      if (w === 'more' && COMPARATIVE[nx.text]) addIssue(issues, { ruleId:'CMP-001', category:'comparative', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'"' + nx.raw + '" 已是比较级，前面不能再用 more', suggestion:nx.raw });
+      else if (w === 'most' && SUPERLATIVE[nx.text]) addIssue(issues, { ruleId:'CMP-001', category:'comparative', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'"' + nx.raw + '" 已是最高级，前面不能再用 most', suggestion:nx.raw });
+      if (w === 'less' && isCountPlural(nx)) addIssue(issues, { ruleId:'QUA-001', category:'quantifier', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'less 修饰不可数名词，可数名词复数应用 fewer', suggestion:'fewer ' + nx.raw });
+      if (w === 'much' && isCountPlural(nx)) addIssue(issues, { ruleId:'QUA-002', category:'quantifier', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'much 修饰不可数名词，可数名词复数应用 many', suggestion:'many ' + nx.raw });
+      if (w === 'many' && UNCOUNTABLE[nx.text]) addIssue(issues, { ruleId:'QUA-003', category:'quantifier', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'many 修饰可数名词复数，不可数名词应用 much', suggestion:'much ' + nx.raw });
+      if (w === 'amount' && nx.text === 'of' && n2 && isCountPlural(n2)) addIssue(issues, { ruleId:'QUA-004', category:'quantifier', confidence:'mid', start:t.start, end:n2.end, errorText:text.slice(t.start, n2.end), message:'amount of 接不可数名词；可数名词复数应用 number of', suggestion:'number of ' + n2.raw });
+      if (w === 'number' && nx.text === 'of' && n2 && UNCOUNTABLE[n2.text]) addIssue(issues, { ruleId:'QUA-004', category:'quantifier', confidence:'mid', start:t.start, end:n2.end, errorText:text.slice(t.start, n2.end), message:'number of 接可数名词复数；不可数名词应用 amount of', suggestion:'amount of ' + n2.raw });
+    }
+  }
+
+  // TNS-001 主将从现；TNS-002 虚拟语气
+  function runClause(tokens, text, issues) {
+    var mr;
+    var reWill = /\b(if|when|until|unless|as soon as)\b([^,.;!?]*?)\bwill\b/gi;
+    while ((mr = reWill.exec(text)) !== null) { var wi = mr.index + mr[0].toLowerCase().lastIndexOf('will'); addIssue(issues, { ruleId:'TNS-001', category:'tense', confidence:'mid', start:wi, end:wi + 4, errorText:'will', message:'【疑似】时间/条件状语从句中不用将来时，应用一般现在时（主将从现）', suggestion:'去掉 will（用一般现在时）' }); }
+    var reYou = /\bif\s+i\s+was\s+you\b/gi;
+    while ((mr = reYou.exec(text)) !== null) addIssue(issues, { ruleId:'TNS-002', category:'tense', confidence:'high', start:mr.index, end:mr.index + mr[0].length, errorText:mr[0], message:'虚拟语气 "If I were you" 用 were，不用 was', suggestion:'if I were you' });
+    var reWish = /\b(wish|as if|if only)\b([^.;!?]*?)\b(he|she|it|i)\s+was\b/gi;
+    while ((mr = reWish.exec(text)) !== null) { var wi2 = mr.index + mr[0].toLowerCase().lastIndexOf('was'); addIssue(issues, { ruleId:'TNS-002', category:'tense', confidence:'mid', start:wi2, end:wi2 + 3, errorText:'was', message:'【疑似】wish / as if 后表虚拟，应用 were 而非 was', suggestion:'were' }); }
+  }
+
+  // RED-001 语义重复（冗余）
+  function runRed(tokens, text, issues) {
+    for (var i = 0; i + 1 < tokens.length; i++) {
+      if (!tokens[i].text) continue;
+      var w1 = tokens[i].text, w2 = tokens[i + 1].text, ge = baseFromEd(w1);
+      var key = Object.prototype.hasOwnProperty.call(REDUNDANT, w1 + ' ' + w2) ? (w1 + ' ' + w2) : (ge !== w1 && Object.prototype.hasOwnProperty.call(REDUNDANT, ge + ' ' + w2) ? ge + ' ' + w2 : null);
+      if (!key) continue;
+      addIssue(issues, { ruleId:'RED-001', category:'redundancy', confidence: key.indexOf('together') !== -1 ? 'mid' : 'high', start:tokens[i].start, end:tokens[i + 1].end, errorText:text.slice(tokens[i].start, tokens[i + 1].end), message:'语义重复："' + tokens[i].raw + ' ' + tokens[i + 1].raw + '" 表意冗余，保留一词即可', suggestion:REDUNDANT[key] });
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -552,6 +595,9 @@
       runNonfin(tokens, text, issues);
       runColl(tokens, text, issues);
       runConfuse(tokens, text, issues);
+      runComp(tokens, text, issues);
+      runClause(tokens, text, issues);
+      runRed(tokens, text, issues);
     }
     return issues;
   }
