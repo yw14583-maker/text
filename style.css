@@ -409,7 +409,18 @@ textarea:focus {
     .timer-box { justify-content: space-between; width: 100%; }
     .card { padding: 16px 13px; }
     .question-title { font-size: 18px; }
-    .directions { font-size: 13px; padding: 13px 14px; }
+    .directions {
+        font-size: 13px;
+        padding: 13px 14px;
+        /* 软键盘弹出时，让中文提纲吸顶保持可见，避免被顶出屏幕 */
+        position: sticky;
+        top: 0;
+        z-index: 8;
+        max-height: 34vh;
+        overflow-y: auto;
+        background: #f3ecdb;
+        box-shadow: 0 6px 18px -10px rgba(60, 54, 40, .5);
+    }
     textarea { height: 200px; font-size: 16px; }
 
     .action-row { flex-direction: column; align-items: stretch; }
