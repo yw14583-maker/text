@@ -35,6 +35,13 @@
   var PLURAL_OK = {waters:1,oils:1,foods:1,sugars:1,salts:1,moneys:1,monies:1,works:1,behaviours:1,behaviors:1,maths:1,peoples:1,fishes:1};
   // 本身无动词用法、复数形式必错的不可数名词（即使被误标为 Verb 也判错）
   var NOUN_STRICT = {information:1,advice:1,equipment:1,knowledge:1,furniture:1,baggage:1,luggage:1,software:1,homework:1,pollution:1};
+  // 后接不定式(to do)的常见动词：漏 to 时报错
+  var TO_VERBS = {want:1,hope:1,decide:1,plan:1,expect:1,agree:1,refuse:1,pretend:1,offer:1,learn:1,manage:1,choose:1,afford:1,attempt:1,intend:1,deserve:1,promise:1};
+  // 动名词还原为原形时的补 e 例外
+  var GERUND_E = {mak:'make',tak:'take',us:'use',writ:'write',driv:'drive',hav:'have',giv:'give',com:'come',bec:'become',mov:'move',choos:'choose',los:'lose',car:'care',shar:'share',hop:'hope',danc:'dance',fac:'face',decid:'decide',improv:'improve',includ:'include',provid:'provide',achiev:'achieve',compar:'compare',creat:'create',increas:'increase',reduc:'reduce',produc:'produce',introduc:'introduce',agre:'agree',manag:'manage',prepar:'prepare',explor:'explore',requir:'require',deserv:'deserve',refus:'refuse',pretend:'pretend',arriv:'arrive'};
+  // 固定搭配：错误搭配 → 正确形式（'' 表示去掉该介词）
+  var V_PREP_RULE = {'depend of':'on','reply of':'to','arrive to':'at','discuss about':'','emphasize on':''};
+  var N_PREP_RULE = {'solution of':'to','reason of':'for','answer of':'to','key of':'to'};
   var PHYS_S = /^(news|maths|math|physics|economics|ethics|statistics|politics|linguistics|electronics)$/;
   var SOUND_AN = {hour:1,honest:1,honor:1,honour:1,heir:1};
   var SOUND_A = {university:1,unique:1,united:1,uniform:1,universal:1,user:1,european:1,one:1,once:1,useful:1,union:1,unit:1,use:1};
@@ -158,7 +165,7 @@
     // ART-002 单数可数名词缺限定词（保守）
     for (var k = 1; k < n; k++) {
       var t = tokens[k];
-      if (!isNoun(t) || isProperNoun(t)) continue;
+      if (!isNoun(t) || isProperNoun(t) || hasAnyTag(t, ['Pronoun'])) continue;
       if (isPlural(t)) continue;
       if (UNCOUNTABLE[t.text]) continue;
       if (NOUN_SKIP[t.text]) continue;
@@ -167,7 +174,7 @@
       if (isDeterminer(prev)) continue;
       // 触发条件：前一词为动词或介词（宾语/介词短语位置，避免主语位置误报）
       if (!hasAnyTag(prev, ['Verb']) && !hasTag(prev, 'Preposition')) continue;
-      if (/^(school|bed|work|home|hospital|prison|church|foot|hand|heart|top|bottom|breakfast|lunch|dinner|once|twice|night)$/.test(t.text)) continue;
+      if (/^(school|bed|work|home|hospital|prison|church|foot|hand|heart|top|bottom|breakfast|lunch|dinner|once|twice|night|sunday|monday|tuesday|wednesday|thursday|friday|saturday|january|february|march|april|june|july|august|september|october|november|december)$/.test(t.text)) continue;
       if (SPORTS[t.text]) continue; // play football/basketball 等运动名词不加冠词
       // 习语局部上下文放行（go to school / at home / by bus ...）
       var ctx = text.slice(Math.max(0, t.start - 18), t.end + 4).toLowerCase();
@@ -388,6 +395,9 @@
   var PAST_BASE = {went:'go',saw:'see',had:'have',did:'do',was:'be',were:'be',made:'make',took:'take',came:'come',got:'get',gave:'give',said:'say',told:'tell',thought:'think',found:'find',left:'leave',met:'meet',knew:'know',became:'become',held:'hold',kept:'keep',built:'build',bought:'buy',caught:'catch',taught:'teach',won:'win',broke:'break',wrote:'write',read:'read',ran:'run',felt:'feel',heard:'hear',sent:'send',put:'put',stood:'stand',understood:'understand',drove:'drive',ate:'eat',spoke:'speak',chose:'choose',brought:'bring',spent:'spend',showed:'show',slept:'sleep',drank:'drink',swam:'swim',drew:'draw',flew:'fly',threw:'throw',wore:'wear'};
   function singularize(t) { var w = t.text; if (IRREG_S3[w]) return IRREG_S3[w]; if (/[sx]$/i.test(w) || /ch$|sh$|o$/i.test(w)) return w + 'es'; if (/[bcdfghjklmnpqrstvwxz]y$/i.test(w)) return w.slice(0, -1) + 'ies'; return w + 's'; }
   function pluralStrip(t) { var w = t.text.toLowerCase(); var base = IRREG_BASE[w]; if (base) return base; if (/ies$/i.test(w)) return w.slice(0, -3) + 'y'; if (/ches$|shes$|xes$|zes$|sses$/i.test(w)) return w.slice(0, -2); return w.replace(/s$/i, ''); }
+  function gerund(w) { if (/[^aeiou]e$/i.test(w)) return w.slice(0, -1) + 'ing'; if (/^(run|sit|get|put|begin|stop|swim|plan|drop|refer|prefer|occur|admit|permit)$/i.test(w)) return w + w.slice(-1) + 'ing'; return w + 'ing'; }
+  function deGerund(w) { if (!/ing$/i.test(w)) return w; var s = w.slice(0, -3); if (/([bcdfgklmnprstvz])\1$/i.test(s)) return s.slice(0, -1); if (GERUND_E[s]) return GERUND_E[s]; if (/i$/i.test(s)) return s.slice(0, -1) + 'y'; return s; }
+  function baseFromEd(w) { if (!/ed$/i.test(w)) return w; var s = w.slice(0, -2); if (/([bcdfgklmnprstvz])\1$/i.test(s)) return s.slice(0, -1); if (GERUND_E[s]) return GERUND_E[s]; if (/i$/i.test(s)) return s.slice(0, -1) + 'y'; return s; }
 
   // VERB-001/002 be 动词搭配错误：be + 动词原形 / be + been
   function runVerb(tokens, text, issues) {
@@ -419,6 +429,67 @@
     }
   }
 
+  // NF-001~004 非谓语动词：介词后接原形 / 情态后接 -ing 或 to / 漏 to / 多余 to
+  function runNonfin(tokens, text, issues) {
+    var n = tokens.length;
+    for (var i = 0; i + 1 < n; i++) {
+      var t = tokens[i], nx = tokens[i + 1];
+      // NF-001 介词(+非to)后接动词原形 → 应用 -ing
+      if ((hasTag(t, 'Preposition') || PREPS[t.text]) && t.text !== 'to' && !MODALS[t.text]) {
+        if (hasTag(nx, 'Infinitive') && !hasAnyTag(nx, ['Noun', 'Adjective'])) {
+          addIssue(issues, { ruleId:'NF-001', category:'nonfinite', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'介词后应接动名词(-ing)，不能接动词原形', suggestion:t.raw + ' ' + gerund(nx.text) });
+        }
+      }
+      // NF-002 情态动词后接 -ing 或 to do（排除 do/does/did，避免 "do shopping" 误判）
+      if (MODALS[t.text] && !/^(do|does|did)$/.test(t.text)) {
+        if (hasTag(nx, 'Gerund')) addIssue(issues, { ruleId:'NF-002', category:'nonfinite', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'情态动词后接动词原形，不用 -ing', suggestion:t.raw + ' ' + deGerund(nx.text) });
+        if (nx.text === 'to' && tokens[i + 2] && hasTag(tokens[i + 2], 'Infinitive')) addIssue(issues, { ruleId:'NF-002', category:'nonfinite', confidence:'high', start:t.start, end:tokens[i + 2].end, errorText:text.slice(t.start, tokens[i + 2].end), message:'情态动词后直接用动词原形，不加 to', suggestion:t.raw + ' ' + tokens[i + 2].raw });
+      }
+      // NF-003 后接不定式的动词漏 to（含 -ed 变形）
+      if (hasTag(t, 'Verb') && !MODALS[t.text]) {
+        var tvBase = TO_VERBS[t.text] ? t.text : baseFromEd(t.text);
+        if (TO_VERBS[tvBase] && hasTag(nx, 'Infinitive') && !hasAnyTag(nx, ['Noun', 'Adjective'])) {
+          addIssue(issues, { ruleId:'NF-003', category:'nonfinite', confidence:'high', start:nx.start, end:nx.end, errorText:nx.raw, message:'"' + t.raw + '" 后接动词应用不定式，需要 to', suggestion:'to ' + nx.raw });
+        }
+      }
+    }
+    // NF-004 make/let + 代词宾语 + to + 动词 → 去掉 to（仅限代词宾语，避免 "make a decision to go" 误判）
+    for (var k = 0; k + 2 < n; k++) {
+      if (!/^(make|made|let)$/.test(tokens[k].text)) continue;
+      var m = k + 1;
+      if (!hasTag(tokens[m], 'Pronoun') || tokens[m].text === 'it') continue;
+      if (tokens[m + 1] && tokens[m + 1].text === 'to' && tokens[m + 2] && hasTag(tokens[m + 2], 'Infinitive')) {
+        addIssue(issues, { ruleId:'NF-004', category:'nonfinite', confidence:'high', start:tokens[m + 1].start, end:tokens[m + 1].end, errorText:tokens[m + 1].raw, message:'make/let 后接动词原形，不加 to', suggestion:'去掉 to' });
+      }
+    }
+  }
+
+  // COLL-001~003 固定搭配：动词+介词、名词+介词、冗余连接
+  function runColl(tokens, text, issues) {
+    for (var i = 0; i + 1 < tokens.length; i++) {
+      var w1 = tokens[i].text, w2 = tokens[i + 1].text;
+      var ge = baseFromEd(w1);
+      var cands = [w1]; if (/s$/i.test(w1)) cands.push(w1.slice(0, -1)); if (ge !== w1) cands.push(ge);
+      var rep = null, isV = false, matched = false;
+      for (var ci = 0; ci < cands.length; ci++) {
+        var kk = cands[ci] + ' ' + w2;
+        if (Object.prototype.hasOwnProperty.call(V_PREP_RULE, kk)) { isV = true; matched = true; rep = V_PREP_RULE[kk]; break; }
+        if (Object.prototype.hasOwnProperty.call(N_PREP_RULE, kk)) { matched = true; rep = N_PREP_RULE[kk]; break; }
+      }
+      if (!matched) continue;
+      if (isV) addIssue(issues, { ruleId:'COLL-001', category:'collocation', confidence:'high', start:tokens[i].start, end:tokens[i + 1].end, errorText:text.slice(tokens[i].start, tokens[i + 1].end), message:'固定搭配：' + tokens[i].raw + ' 不与 ' + tokens[i + 1].raw + ' 连用', suggestion:rep ? tokens[i].raw + ' ' + rep : tokens[i].raw + '（去掉 ' + tokens[i + 1].raw + '）' });
+      else addIssue(issues, { ruleId:'COLL-002', category:'collocation', confidence:'mid', start:tokens[i].start, end:tokens[i + 1].end, errorText:text.slice(tokens[i].start, tokens[i + 1].end), message:'固定搭配：' + tokens[i].raw + ' 后常用介词 ' + rep, suggestion:tokens[i].raw + ' ' + rep });
+    }
+    var mr;
+    // COLL-003 冗余：despite of / although…but / because…so
+    var reDes = /\bdespite\s+of\b/gi;
+    while ((mr = reDes.exec(text)) !== null) addIssue(issues, { ruleId:'COLL-003', category:'collocation', confidence:'high', start:mr.index, end:mr.index + mr[0].length, errorText:mr[0], message:'despite 后不加 of（或改用 in spite of）', suggestion:'despite' });
+    var reBut = /\b(?:although|though)\b([^.;!?]*?)\bbut\b/gi;
+    while ((mr = reBut.exec(text)) !== null) { var bi = mr.index + mr[0].toLowerCase().lastIndexOf('but'); addIssue(issues, { ruleId:'COLL-003', category:'collocation', confidence:'mid', start:bi, end:bi + 3, errorText:'but', message:'although/though 与 but 不能同时使用，去掉 but', suggestion:'去掉 but' }); }
+    var reSo = /\bbecause\b([^.;!?]*?)\bso\b/gi;
+    while ((mr = reSo.exec(text)) !== null) { var si = mr.index + mr[0].toLowerCase().lastIndexOf('so'); addIssue(issues, { ruleId:'COLL-003', category:'collocation', confidence:'mid', start:si, end:si + 2, errorText:'so', message:'because 与 so 不能同时使用，去掉 so', suggestion:'去掉 so' }); }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -429,6 +500,8 @@
       runSva(tokens, text, issues);
       runVerb(tokens, text, issues);
       runNoun(tokens, text, issues);
+      runNonfin(tokens, text, issues);
+      runColl(tokens, text, issues);
     }
     return issues;
   }
