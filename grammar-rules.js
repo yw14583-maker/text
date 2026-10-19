@@ -100,7 +100,7 @@
   function classifySubject(t) {
     var w = t.text;
     if (w === 'he' || w === 'she' || w === 'it') return { plural: false, third: true, name: w };
-    if (w === 'they' || w === 'we') return { plural: true, third: false, name: w };
+    if (w === 'they' || w === 'we' || w === 'those' || w === 'these') return { plural: true, third: false, name: w };
     if (w === 'i' || w === 'you') return null; // 非三单，不判定
     if (isNoun(t) && !isProperNoun(t)) { var p = isPlural(t); return { plural: p, third: !p, name: w }; }
     return null;
@@ -116,18 +116,30 @@
     }
     return false;
   }
-  // 取动词左边最近的主体（跳过副词/限定词/介词短语宾语），遇 modal/连接词返回 null
+  // 取动词左边最近的主体（跳过副词/限定词/介词短语宾语）；若跨过定语从句则取从句先行词
   function subjectBefore(tokens, idx) {
+    var lo = 0; // 左边界
     for (var k = idx - 1; k >= 0; k--) {
       var t = tokens[k];
-      if (t.text === ',' || t.text === ';' || t.text === '.' || t.text === 'and' || t.text === 'or' || t.text === 'but' || t.text === 'then' || t.text === 'to') return null;
-      if (t.text === 'there') continue; // 存在句 there 非真正主语
+      if (t.text === ',' || t.text === ';' || t.text === '.' || t.text === 'and' || t.text === 'or' || t.text === 'but' || t.text === 'then' || t.text === 'to') { lo = k + 1; break; }
       if (MODALS[t.text]) return null;
-      if (hasAnyTag(t, ['Adverb'])) continue;
-      if (t.text === 'not' || t.text === 'also' || t.text === 'always' || t.text === 'often' || t.text === 'never' || t.text === 'usually' || t.text === 'however') continue;
-      if (isDeterminer(t)) continue;
-      var cl = classifySubject(t);
-      if (cl) { if (isPPObject(tokens, k)) continue; return cl; }
+      lo = k;
+    }
+    // 若区间内含关系代词，则主语在其之前（定语从句内的名词不算）
+    for (var q = idx - 1; q >= lo; q--) {
+      if (/^(who|whom|whose|which|that)$/.test(tokens[q].text)) {
+        for (var p = q - 1; p >= lo; p--) { if (hasAnyTag(tokens[p], ['Noun', 'Pronoun'])) { if (isPPObject(tokens, p)) break; return classifySubject(tokens[p]); } }
+        return null;
+      }
+    }
+    for (var r = idx - 1; r >= lo; r--) {
+      var tt = tokens[r];
+      if (hasAnyTag(tt, ['Adverb'])) continue;
+      if (tt.text === 'there') continue;
+      if (t.text === 'not' || tt.text === 'also' || tt.text === 'always' || tt.text === 'often' || tt.text === 'never' || tt.text === 'usually' || tt.text === 'however') continue;
+      if (isDeterminer(tt)) continue;
+      var cl = classifySubject(tt);
+      if (cl) { if (isPPObject(tokens, r)) continue; return cl; }
     }
     return null;
   }
@@ -444,8 +456,8 @@
     var n = tokens.length;
     for (var i = 0; i + 1 < n; i++) {
       var t = tokens[i], nx = tokens[i + 1];
-      // NF-001 介词(+非to)后接动词原形 → 应用 -ing
-      if ((hasTag(t, 'Preposition') || PREPS[t.text]) && t.text !== 'to' && !MODALS[t.text]) {
+      // NF-001 介词(+非to)后接动词原形 → 应用 -ing（排除关系代词/代词被误标为介词）
+      if ((hasTag(t, 'Preposition') || PREPS[t.text]) && t.text !== 'to' && !MODALS[t.text] && !hasAnyTag(t, ['Pronoun']) && !/^(who|whom|whose|which|that)$/.test(t.text)) {
         if (hasTag(nx, 'Infinitive') && !hasAnyTag(nx, ['Noun', 'Adjective'])) {
           addIssue(issues, { ruleId:'NF-001', category:'nonfinite', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'介词后应接动名词(-ing)，不能接动词原形', suggestion:t.raw + ' ' + gerund(nx.text) });
         }
@@ -582,6 +594,31 @@
     }
   }
 
+  // CLA-001 非限制性定语从句用 that；CLA-002 关系代词作主语时谓语与先行词一致
+  function runRel(tokens, text, issues) {
+    var n = tokens.length;
+    // CLA-001 逗号 + that + 实义动词 → 非限制性从句应用 which/who（逗号非 token，用文本正则定位）
+    var reT = /,\s*that\b/gi, mm;
+    while ((mm = reT.exec(text)) !== null) {
+      var afterPos = mm.index + mm[0].length, vt = null;
+      for (var z = 0; z < n; z++) { if (tokens[z].start >= afterPos) { vt = tokens[z]; break; } }
+      if (vt && hasTag(vt, 'Verb') && !/^(is|are|was|were)$/.test(vt.text))
+        addIssue(issues, { ruleId:'CLA-001', category:'relative', confidence:'mid', start:mm.index, end:vt.end, errorText:text.slice(mm.index, vt.end), message:'【疑似】非限制性定语从句用 which/who，不用 that', suggestion:'which / who' });
+    }
+    for (var i = 0; i < n; i++) {
+      // CLA-002 关系代词作主语（其后直接跟动词）→ 谓语须与先行词一致
+      if (/^(who|which|that)$/.test(tokens[i].text) && i > 0) {
+        var ant = tokens[i - 1], vx = tokens[i + 1];
+        if (!(hasAnyTag(ant, ['Noun', 'Pronoun']) || /^(those|these)$/.test(ant.text)) || !vx || !hasTag(vx, 'Verb')) continue;
+        if (hasTag(vx, 'PastTense') || hasTag(vx, 'Gerund')) continue;
+        var antPl = isPlural(ant) || /^(those|these|they|we|people)$/.test(ant.text);
+        var vSing = /[sx]$/i.test(vx.text) || /^(is|has|does|was)$/.test(vx.text);
+        if (antPl && vSing) addIssue(issues, { ruleId:'CLA-002', category:'relative', confidence:'high', start:vx.start, end:vx.end, errorText:vx.raw, message:'定语从句谓语与先行词 "' + ant.raw + '"（复数）不一致，应用复数谓语', suggestion:pluralStrip(vx) });
+        else if (!antPl && !vSing && !/^(are|were|have|do)$/.test(vx.text)) addIssue(issues, { ruleId:'CLA-002', category:'relative', confidence:'high', start:vx.start, end:vx.end, errorText:vx.raw, message:'定语从句谓语与先行词 "' + ant.raw + '"（单数）不一致，应用单数谓语', suggestion:singularize(vx) });
+      }
+    }
+  }
+
   // FRAG-001 残句：以从属连词开头却无主句
   function runFrag(tokens, text, issues) {
     var reS = /[^.!?]+[.!?]+|[^.!?]+$/g, m;
@@ -621,6 +658,7 @@
       runComp(tokens, text, issues);
       runClause(tokens, text, issues);
       runRed(tokens, text, issues);
+      runRel(tokens, text, issues);
       runFrag(tokens, text, issues);
     }
     return issues;
