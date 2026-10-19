@@ -25,6 +25,8 @@
   var COUNTRY_OK = {'united states':1,'united kingdom':1,us:1,usa:1,uk:1};
   // 官方/惯用名称本就带 the（避免 ART-006 误判）
   var THE_OK = {netherlands:1,philippines:1,maldives:1,seychelles:1,bahamas:1,alps:1,andes:1,himalayas:1,rockies:1};
+  // 「the + 名词」为正常用法、但常被 compromise 误标为专有名词的词，ART-006 放行
+  var COMMON_NOUN_WHITELIST = {police:1,government:1,public:1,staff:1,audience:1,crew:1,masses:1,majority:1};
   var INDEF = {everyone:1,everybody:1,someone:1,somebody:1,anyone:1,anybody:1,nobody:1,nothing:1,everything:1};
   var COLLECTIVE = {family:1,team:1,class:1,group:1,committee:1,staff:1,audience:1,government:1,public:1,crew:1};
   var ORDINALS = {first:1,second:1,third:1,fourth:1,fifth:1,sixth:1,seventh:1,eighth:1,ninth:1,tenth:1};
@@ -186,6 +188,7 @@
     for (var p = 0; p + 1 < n; p++) {
       if (tokens[p].text !== 'the') continue;
       var nm = tokens[p + 1];
+      if (COMMON_NOUN_WHITELIST[nm.text]) continue; // the police/government/public... 属正常用法，放行
       if (!isProperNoun(nm)) continue;
       if (COUNTRY_OK[nm.text]) continue;
       if (THE_OK[nm.text]) continue; // 官方名称本就带 the（Netherlands/Philippines 等）
