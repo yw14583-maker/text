@@ -40,6 +40,13 @@
   var UNIQUE_NOUNS = {sun:1,moon:1,world:1,internet:1};
   // 名词/动词同形且易歧义的词，ART-002（缺冠词）不判定
   var NOUN_VERB_HOMO = {rise:1,fall:1,grow:1,matter:1,help:1,hope:1,change:1,remain:1,differ:1,increase:1,decrease:1,decline:1,report:1,study:1,rise:1,work:1,damage:1};
+  // each/every 等不可直接修饰的不可数抽象名词
+  var EACH_NOUN = {information:1,advice:1,knowledge:1,research:1,evidence:1,progress:1,equipment:1,furniture:1,homework:1,news:1,feedback:1};
+  // 限定词（含物主代词）：二者不能连用
+  var POSS_DET = {my:1,your:1,his:1,her:1,its:1,our:1,their:1};
+  var CENTRAL_DET = {the:1,a:1,an:1,this:1,these:1,those:1,some:1,any:1,no:1,every:1,each:1,another:1,neither:1,either:1};
+  // 口语叹词（学术写作不宜）
+  var INTERJECTION = {oh:1,wow:1,oops:1,whoa:1,yay:1,hurrah:1,hooray:1,gosh:1,gee:1,ouch:1,yikes:1,hmm:1,uh:1,um:1,hey:1,yeah:1,yep:1,nope:1,hi:1};
   var COUNTRY_OK = {'united states':1,'united kingdom':1,us:1,usa:1,uk:1};
   // 官方/惯用名称本就带 the（避免 ART-006 误判）
   var THE_OK = {netherlands:1,philippines:1,maldives:1,seychelles:1,bahamas:1,alps:1,andes:1,himalayas:1,rockies:1};
@@ -542,6 +549,7 @@
       var sb = subjectBefore(tokens, v);
       if (!sb) continue;
       var wv = tv.text;
+      if (hasTag(tv, 'Auxiliary') && !/^(is|are|was|were|has|have)$/i.test(wv)) continue; // got 等助动词不参与 +s/es 一致判定
       // 1) be/have 助动词主谓一致（吸收 Gemini 亮点：独立分支，比通用 +s/es 更稳）
       if (/^(is|are|was|were|has|have)$/i.test(wv)) {
         if (PHYS_S.test(sb.name) || INDEF[sb.name]) continue; // 这二者交给 SVA-006 / SVA-004
@@ -927,11 +935,14 @@
       if (/^(each|every|either|neither)$/.test(w) && nx && hasTag(nx, 'Noun') && (hasTag(nx, 'Plural') || looksPlural(nx.text)) && !UNCOUNTABLE[nx.text] && !PHYS_S.test(nx.text)) {
         addIssue(issues, { ruleId:'NOUN-003', category:'noun', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'each/every/either/neither 后接单数可数名词，不能用复数', suggestion:w + ' ' + nounSingular(nx.text) });
       }
-      // NOUN-004 one of the/my/these/those + 单数可数名词
-      if (w === 'one' && nx && nx.text === 'of') {
+      if (/^(each|every|either|neither)$/.test(w) && nx && EACH_NOUN[nx.text]) {
+        addIssue(issues, { ruleId:'NOUN-003', category:'noun', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'each/every 不能直接修饰不可数名词 "' + nx.raw + '"', suggestion:'改用 all / a piece of 等' });
+      }
+      // NOUN-004 one/all/most… + of + the/my/these + 单数可数名词
+      if (/^(one|all|most|some|many|few|several|both|half|none|each|either|neither)$/.test(w) && nx && nx.text === 'of') {
         var d4 = tok(tokens, i + 2), n4 = tok(tokens, i + 3);
         if (d4 && n4 && isDeterminer(d4) && hasTag(n4, 'Noun') && !hasTag(n4, 'Plural') && !looksPlural(n4.text) && !UNCOUNTABLE[n4.text] && !isProperNoun(n4)) {
-          addIssue(issues, { ruleId:'NOUN-004', category:'noun', confidence:'high', start:t.start, end:n4.end, errorText:text.slice(t.start, n4.end), message:'one of ... 后应接复数名词，"' + n4.raw + '" 是单数', suggestion:'one of ' + d4.raw + ' ' + pluralize(n4.text) });
+          addIssue(issues, { ruleId:'NOUN-004', category:'noun', confidence:'high', start:t.start, end:n4.end, errorText:text.slice(t.start, n4.end), message:'"' + w + ' of ..." 后应接复数名词，"' + n4.raw + '" 是单数', suggestion:w + ' of ' + d4.raw + ' ' + pluralize(n4.text) });
         }
       }
       // NF-005 后接动名词的动词误用不定式（enjoy to do 等）
@@ -1083,6 +1094,10 @@
   var LINK_VERB = {seem:1,seems:1,seemed:1,taste:1,tastes:1,tasted:1,smell:1,smells:1,smelt:1,sound:1,sounds:1,sounded:1,become:1,becomes:1,became:1,appear:1,appears:1,appeared:1,remain:1,remains:1,remained:1,stay:1,stays:1,stayed:1,grow:1,grows:1,grew:1,turn:1,turns:1,turned:1};
   var CAUSE_VERB = {make:1,makes:1,made:1,let:1,lets:1,have:1,has:1,had:1};
   var OBJ_PRON = {me:1,him:1,her:1,them:1,us:1,you:1,it:1};
+  // 不及物动词各形式（用于 PASS-002：不能用于被动）
+  var INTRANS = {happen:1,happens:1,happened:1,occur:1,occurs:1,occurred:1,arise:1,arises:1,arose:1,arisen:1,die:1,dies:1,died:1,appear:1,appears:1,appeared:1,arrive:1,arrives:1,arrived:1,exist:1,exists:1,existed:1,belong:1,belongs:1,belonged:1,emerge:1,emerges:1,emerged:1,vanish:1,vanishes:1,vanished:1,collapse:1,collapses:1,collapsed:1,consist:1,consists:1,consisted:1,seem:1,seems:1,seemed:1,fall:1,falls:1,fell:1,rise:1,rises:1,rose:1,come:1,comes:1,came:1,tumble:1,tumbles:1,tumbled:1,depart:1,departs:1,departed:1};
+  // 动词原形 → 过去分词（用于 PASS-003；只收原形与过去分词不同的词）
+  var PP_FROM_BASE = {show:'shown',prove:'proven',write:'written',send:'sent',take:'taken',give:'given',make:'made',do:'done',see:'seen',find:'found',hold:'held',know:'known',break:'broken',choose:'chosen',drive:'driven',eat:'eaten',forget:'forgotten',freeze:'frozen',hide:'hidden',ride:'ridden',ring:'rung',speak:'spoken',steal:'stolen',swim:'swum',throw:'thrown',wear:'worn',wake:'woken',begin:'begun',drink:'drunk',sing:'sung',go:'gone',lie:'lain'};
   function prevIdx(tokens, i) { for (var k = i - 1; k >= 0; k--) { if (tokens[k].text) return k; } return -1; }
   function ingBase(w) {
     if (!/ing$/i.test(w)) return '';
@@ -1095,9 +1110,17 @@
   function runVerb2(tokens, text, issues) {
     for (var i = 0; i < tokens.length; i++) {
       var t = tokens[i], w = t.text, nx = tok(tokens, i + 1);
-      // PASS-001 be + 简单过去式 → 应为过去分词
-      if (/^(am|is|are|was|were|be|been|being)$/i.test(w) && nx && PAST_TO_PP[nx.text]) {
-        addIssue(issues, { ruleId:'PASS-001', category:'verb', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'被动语态 / be 动词后要用过去分词，不能接简单过去式 "' + nx.raw + '"', suggestion:w + ' ' + PAST_TO_PP[nx.text] });
+      // PASS-001 be / get + 简单过去式 → 应为过去分词
+      if (/^(am|is|are|was|were|be|been|being|get|gets|got)$/i.test(w) && nx && PAST_TO_PP[nx.text]) {
+        addIssue(issues, { ruleId:'PASS-001', category:'verb', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'被动语态要用过去分词，不能接简单过去式 "' + nx.raw + '"', suggestion:w + ' ' + PAST_TO_PP[nx.text] });
+      }
+      // PASS-002 不及物动词误用被动（was happened / is consisted of …）
+      if (/^(am|is|are|was|were|be|been|being)$/i.test(w) && nx && INTRANS[nx.text]) {
+        addIssue(issues, { ruleId:'PASS-002', category:'verb', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'"' + nx.raw + '" 是不及物动词，不能用于被动语态，应用主动语态', suggestion:nx.raw + '（去掉 be 动词）' });
+      }
+      // PASS-003 be + 动词原形误用（compromise 常把 show/use 等标为名词，VERB-001 会漏）
+      if (/^(am|is|are|was|were|be|been|being)$/i.test(w) && nx && PP_FROM_BASE[nx.text] && !hasTag(nx, 'Infinitive')) {
+        addIssue(issues, { ruleId:'PASS-003', category:'verb', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'被动语态应用过去分词，动词原形 "' + nx.raw + '" 后面不能直接跟 be', suggestion:w + ' ' + PP_FROM_BASE[nx.text] });
       }
       // STATIVE-001 be + 状态动词 -ing
       if (/^(am|is|are|was|were)$/i.test(w) && nx && /ing$/i.test(nx.text)) {
@@ -1386,6 +1409,78 @@
     }
   }
 
+  // DET-002/003 限定词搭配；INTJ-001 口语叹词
+  function runDet(tokens, text, issues) {
+    for (var i = 0; i < tokens.length; i++) {
+      var t = tokens[i], w = t.text, wl = w.toLowerCase(), nx = tok(tokens, i + 1);
+      if (!nx) continue;
+      // DET-002 两个限定词连用（the my / my the / a my …）
+      if (CENTRAL_DET[wl] && POSS_DET[nx.text]) {
+        addIssue(issues, { ruleId:'DET-002', category:'determiner', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'限定词不能连用："' + w + ' ' + nx.raw + '"，只保留一个', suggestion:'删掉 "' + w + '" 或 "' + nx.raw + '"' });
+      } else if (POSS_DET[wl] && CENTRAL_DET[nx.text]) {
+        addIssue(issues, { ruleId:'DET-002', category:'determiner', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'限定词不能连用："' + w + ' ' + nx.raw + '"，只保留一个', suggestion:'删掉 "' + w + '" 或 "' + nx.raw + '"' });
+      }
+      // DET-003 another + 复数/不可数
+      if (wl === 'another' && (hasTag(nx, 'Plural') || looksPlural(nx.text) || IRREG_PLURAL[nx.text])) {
+        addIssue(issues, { ruleId:'DET-003', category:'determiner', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'another 后应接单数可数名词，不能接复数 "' + nx.raw + '"', suggestion:'another ' + nounSingular(nx.text) });
+      } else if (wl === 'another' && EACH_NOUN[nx.text]) {
+        addIssue(issues, { ruleId:'DET-003', category:'determiner', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'another 不能直接修饰不可数名词 "' + nx.raw + '"', suggestion:'another piece of ' + nx.raw + ' / more ' + nx.raw });
+      }
+      // INTJ-001 学术写作中的口语叹词
+      var atStart = t.start === 0 || /[.!?]\s*$/.test(text.slice(0, t.start));
+      if (atStart && INTERJECTION[wl]) {
+        addIssue(issues, { ruleId:'INTJ-001', category:'interjection', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'学术写作中不宜使用口语叹词 "' + t.raw + '"，应删除', suggestion:'删除该叹词' });
+      }
+    }
+  }
+
+  // CONJ-002/003 连词；ADV-001~003 副词
+  var CONJ_ADV = {however:1,therefore:1,moreover:1,furthermore:1,nevertheless:1,nonetheless:1,consequently:1,additionally:1,meanwhile:1,otherwise:1,instead:1,similarly:1,conversely:1,accordingly:1};
+  var ADJ_ADV = {quick:1,slow:1,careful:1,quiet:1,sudden:1,serious:1,real:1,exact:1,clear:1,correct:1,different:1,easy:1,loud:1,soft:1,beautiful:1,polite:1,rude:1,honest:1,brave:1,foolish:1,safe:1,dangerous:1,cheerful:1,happy:1,firm:1,strong:1,weak:1,tight:1,loose:1};
+  function runConjAdv(tokens, text, issues) {
+    for (var i = 0; i < tokens.length; i++) {
+      var t = tokens[i], w = t.text, wl = w.toLowerCase(), nx = tok(tokens, i + 1);
+      var atStart = t.start === 0 || /[.!?]\s*$/.test(text.slice(0, t.start));
+      // 句首 But/And/So 属可接受写法（参考范文亦有），不判定
+      // CONJ-002 like → such as（列举）
+      if (wl === 'like' && nx && nx.text !== 'to' && hasAnyTag(nx, ['Noun']) && !hasAnyTag(nx, ['Verb'])) {
+        var pv2 = prevNonEmpty(tokens, i);
+        if (pv2 && (hasAnyTag(pv2, ['Noun', 'Adjective']) || pv2.text === ',')) {
+          addIssue(issues, { ruleId:'CONJ-002', category:'conjunction', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'正式写作中列举应用 "such as"，不用 "like"', suggestion:'such as' });
+        }
+      }
+      // CONJ-003 because + 名词短语 → because of
+      if (wl === 'because' && nx && isDeterminer(nx)) {
+        var n3 = tok(tokens, i + 2);
+        if (n3 && hasAnyTag(n3, ['Noun'])) {
+          var after3 = tok(tokens, i + 3);
+          var isClause = after3 && (hasAnyTag(after3, ['Verb']) || MODALS[after3.text] || /^(that|which|who|whom|whose)$/.test(after3.text) || /^(is|are|was|were|be|been|being|am|has|have|had|do|does|did)$/i.test(after3.text));
+          if (!isClause) addIssue(issues, { ruleId:'CONJ-003', category:'conjunction', confidence:'mid', start:t.start, end:n3.end, errorText:text.slice(t.start, n3.end), message:'because 后接名词短语时应加 of（because of）', suggestion:'because of' });
+        }
+      }
+      // ADV-001 动词 + 形容词（应用副词）
+      if (ADJ_ADV[wl] && !(nx && hasAnyTag(nx, ['Noun']) && !hasAnyTag(nx, ['Pronoun']))) {
+        var pv3 = prevNonEmpty(tokens, i), pvl = pv3 ? pv3.text.toLowerCase() : '';
+        var isLink = pv3 && (LINK_VERB[pvl] || /^(is|are|was|were|be|been|being|am|get|gets|got|look|looks|looked|feel|feels|felt|make|makes|made)$/.test(pvl));
+        if (pv3 && !isLink && hasAnyTag(pv3, ['Verb']) && !hasTag(pv3, 'Copula')) {
+          addIssue(issues, { ruleId:'ADV-001', category:'adverb', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'修饰动词应用副词，不用形容词 "' + t.raw + '"', suggestion:t.raw + 'ly' });
+        }
+      }
+      // ADV-002 very 直接修饰动词
+      if (wl === 'very' && nx && hasAnyTag(nx, ['Verb']) && !hasAnyTag(nx, ['Adjective', 'Adverb'])) {
+        addIssue(issues, { ruleId:'ADV-002', category:'adverb', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'very 不能直接修饰动词，应用 "very much" 或 "really"', suggestion:'…… very much / really ' + nx.raw });
+      }
+      // ADV-003 句首连接副词后缺逗号
+      if (atStart && CONJ_ADV[wl] && nx) {
+        var rest = text.slice(t.end);
+        var concessive = /^(much|many|long|far|often|hard|well|deep)$/.test(nx.text);
+        if (!/^\s*,/.test(rest) && !concessive && !(wl === 'instead' && nx.text === 'of')) {
+          addIssue(issues, { ruleId:'ADV-003', category:'adverb', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'句首连接副词 "' + t.raw + '" 后通常应加逗号', suggestion:t.raw + ',' });
+        }
+      }
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -1416,6 +1511,8 @@
       runPunc(tokens, text, issues);
       runEmp(tokens, text, issues);
       runSva2(tokens, text, issues);
+      runDet(tokens, text, issues);
+      runConjAdv(tokens, text, issues);
     }
     return issues;
   }
