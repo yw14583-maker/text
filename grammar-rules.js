@@ -1481,6 +1481,184 @@
     }
   }
 
+  // PRON-001/002 代词；ADJ-001~003 形容词
+  var PERSON_NOUN = {student:1,students:1,researcher:1,researchers:1,respondent:1,respondents:1,participant:1,participants:1,people:1,person:1,persons:1,author:1,authors:1,worker:1,workers:1,child:1,children:1,teacher:1,teachers:1,consumer:1,consumers:1,scholar:1,scholars:1,scientist:1,scientists:1,reviewer:1,reviewers:1,reader:1,readers:1,farmer:1,farmers:1,dweller:1,dwellers:1,citizen:1,citizens:1,employee:1,employees:1,visitor:1,visitors:1,user:1,users:1,manager:1,managers:1,nurse:1,nurses:1,doctor:1,doctors:1};
+  var ED_ADJ = {interested:1,excited:1,surprised:1,confused:1,disappointed:1,worried:1,satisfied:1,bored:1,tired:1,frightened:1,amazed:1,shocked:1,motivated:1,encouraged:1,inspired:1,embarrassed:1};
+  var ING_ADJ = {interesting:1,exciting:1,surprising:1,confusing:1,disappointing:1,worrying:1,satisfying:1,boring:1,tiring:1,frightening:1,amazing:1,shocking:1,motivating:1,encouraging:1,inspiring:1,embarrassing:1};
+  function runPronAdj(tokens, text, issues) {
+    // PRON-001 句首宾格代词作主语
+    for (var i = 0; i < tokens.length; i++) {
+      var t = tokens[i], w = t.text, wl = w.toLowerCase(), nx = tok(tokens, i + 1);
+      var atStart = t.start === 0 || /[.!?]\s*$/.test(text.slice(0, t.start));
+      if (atStart && /^(me|him|her|us|them)$/.test(wl) && nx && (nx.text === 'and' || hasAnyTag(nx, ['Verb']) || MODALS[nx.text])) {
+        addIssue(issues, { ruleId:'PRON-001', category:'pronoun', confidence:'mid', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'句首作主语应用主格代词（I/he/she/we/they），不能用宾格 "' + wl + '"', suggestion:'改用 I / he / she / we / they' });
+      }
+      // ADJ-001 be + -ed 分词形容词，但主语为非人事物 → 应用 -ing 形式
+      if (/^(am|is|are|was|were)$/i.test(w) && nx && ED_ADJ[nx.text]) {
+        var subj2 = null;
+        for (var b2 = i - 1; b2 >= Math.max(0, i - 3); b2--) {
+          var tb = tokens[b2];
+          if (isDeterminer(tb) || hasAnyTag(tb, ['Adjective', 'Adverb', 'Possessive'])) continue;
+          subj2 = tb; break;
+        }
+        var sl = subj2 ? subj2.text.toLowerCase() : '';
+        if (subj2 && !hasAnyTag(subj2, ['Pronoun']) && !PERSON_NOUN[sl]) {
+          addIssue(issues, { ruleId:'ADJ-001', category:'adjective', confidence:'mid', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'主语是非人事物，表语应用 -ing 形式（"' + nx.raw + '" → ' + nx.text.replace(/ed$/i, 'ing') + '）', suggestion:w + ' ' + nx.text.replace(/ed$/i, 'ing') });
+        }
+      }
+      // ADJ-002 enough + 形容词（语序错误）
+      if (wl === 'enough' && nx && hasAnyTag(nx, ['Adjective'])) {
+        addIssue(issues, { ruleId:'ADJ-002', category:'adjective', confidence:'mid', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'enough 应放在形容词之后（形容词 + enough）', suggestion:nx.raw + ' enough' });
+      }
+      // ADJ-003 very + 比较级
+      if (wl === 'very' && nx && (hasTag(nx, 'Comparative') || COMPARATIVE[nx.text]) && nx.text !== 'other') {
+        addIssue(issues, { ruleId:'ADJ-003', category:'adjective', confidence:'mid', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'very 不能修饰比较级，应用 much / far / a lot + 比较级', suggestion:'much ' + nx.raw });
+      }
+      // ADJ-004 人物主语 + be + -ing 形容词 + 介词 → 应用 -ed 形式
+      if (/^(am|is|are|was|were)$/i.test(w) && nx && ING_ADJ[nx.text]) {
+        var n3a = tok(tokens, i + 2);
+        if (n3a && /^(in|about|with|by|at)$/.test(n3a.text)) {
+          var subj3 = null;
+          for (var b3 = i - 1; b3 >= Math.max(0, i - 3); b3--) {
+            var tb3 = tokens[b3];
+            if (isDeterminer(tb3) || hasAnyTag(tb3, ['Adjective', 'Adverb', 'Possessive'])) continue;
+            subj3 = tb3; break;
+          }
+          var sl3 = subj3 ? subj3.text.toLowerCase() : '';
+          if (subj3 && (hasAnyTag(subj3, ['Pronoun']) || PERSON_NOUN[sl3])) {
+            addIssue(issues, { ruleId:'ADJ-004', category:'adjective', confidence:'mid', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'人物作主语时表语应用 -ed 形式（"' + nx.raw + '" → ' + nx.text.replace(/ing$/i, 'ed') + '）', suggestion:w + ' ' + nx.text.replace(/ing$/i, 'ed') });
+          }
+        }
+      }
+      // PRON-003 介词后误用主格代词
+      var pv4 = prevNonEmpty(tokens, i);
+      if (pv4 && /^(to|for|with|from|of|at|about|into|through|without|against|among|between)$/.test(pv4.text) && /^(i|he|she|we|they)$/.test(wl)) {
+        var isClauseStart = nx && (hasAnyTag(nx, ['Verb']) || MODALS[nx.text] || /^(am|is|are|was|were)$/i.test(nx.text));
+        if (!isClauseStart) {
+          addIssue(issues, { ruleId:'PRON-003', category:'pronoun', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'介词后应用宾格代词，不能用主格 "' + wl + '"', suggestion:{i:'me',he:'him',she:'her',we:'us',they:'them'}[wl] });
+        }
+      }
+    }
+    // PRON-002 between you and I → me
+    var reP2 = /\b[Bb]etween\s+[A-Za-z]+\s+and\s+I\b/g, mP2;
+    while ((mP2 = reP2.exec(text)) !== null) {
+      addIssue(issues, { ruleId:'PRON-002', category:'pronoun', confidence:'high', start:mP2.index, end:mP2.index + mP2[0].length, errorText:mP2[0], message:'介词 between 后应用宾格代词，不能用主格 I', suggestion:'between … and me' });
+    }
+  }
+
+  // ---------------- 介词（PREP）+ 名词（NOUN）补充规则 ----------------
+  var WEEKDAYS = {monday:1,tuesday:1,wednesday:1,thursday:1,friday:1,saturday:1,sunday:1};
+  var DAY_PARTS = {morning:1,afternoon:1,evening:1};
+  var SEASONS = {summer:1,winter:1,spring:1,autumn:1,fall:1};
+  var DURATION_UNITS = {year:1,years:1,month:1,months:1,week:1,weeks:1,day:1,days:1,hour:1,hours:1,decade:1,decades:1,century:1,centuries:1};
+  // 形容词/副词 + 误用介词（正确形式在值中）
+  var ADJ_PREP_ERR = {
+    'interested on':'in','interested at':'in','interested about':'in','interested for':'in',
+    'afraid from':'of','afraid with':'of','responsible of':'for','aware about':'of','capable to':'of',
+    'regardless to':'of','regarding to':'regarding'
+  };
+  // 兼作可数用的物质名词，many/few 不判错
+  var MASS_SKIP = {fish:1,chicken:1,meat:1,beef:1,pork:1,rain:1,snow:1};
+  // 不规则复数但仍属可数名词，much/less 判定时不放行
+  var COUNT_IRREG = {people:1,children:1,men:1,women:1,feet:1,teeth:1,mice:1,geese:1,criteria:1,phenomena:1};
+  // 形似复数（-s 结尾）实为单数的词，this + 复数 不判错
+  var S_PLURAL_SKIP = {means:1,gas:1,plus:1,chaos:1};
+  // 严格意义的可数复数名词（用于判断 much/less/amount of 的误用）
+  function pluralNounish(t) {
+    if (UNCOUNTABLE[t.text] || PLURAL_OK[t.text] || PHYS_S.test(t.text) || S_PLURAL_SKIP[t.text]) return false;
+    if (IRREG_PLURAL[t.text]) return !!COUNT_IRREG[t.text];
+    return !hasTag(t, 'Singular') && looksPlural(t.text);
+  }
+  function strictPluralTok(t) { return hasAnyTag(t, ['Noun']) && pluralNounish(t); }
+  // 严格意义的单数可数名词（用于判断 these/those 的误用；按词形而非词性标签判断）
+  function singularCountTok(t) {
+    if (UNCOUNTABLE[t.text] || PLURAL_OK[t.text] || IRREG_PLURAL[t.text]) return false;
+    if (isProperNoun(t) || NOUN_VERB_HOMO[t.text]) return false;
+    if (NUM_WORDS[t.text] !== undefined || /^\d+$/.test(t.text)) return false; // these two / those three
+    if (!hasTag(t, 'Noun')) return false;
+    return !looksPlural(t.text);
+  }
+  function runPrepNoun(tokens, text, issues) {
+    var n = tokens.length;
+    for (var i = 0; i < n; i++) {
+      var t = tokens[i], w = t.text, nx = tok(tokens, i + 1), n2 = tok(tokens, i + 2), n3 = tok(tokens, i + 3);
+      // PREP-002 时间/季节/年份介词误用
+      if (w === 'on' && nx && nx.text === 'the' && n2 && DAY_PARTS[n2.text] && !(n3 && n3.text === 'of')) {
+        addIssue(issues, { ruleId:'PREP-002', category:'preposition', confidence:'high', start:t.start, end:n2.end, errorText:text.slice(t.start, n2.end), message:'泛指"在早上/下午/晚上"用 in，不用 on（"on the morning of + 具体日期"除外）', suggestion:'in the ' + n2.raw });
+      }
+      if (w === 'at' && nx && nx.text === 'the' && n2 && DAY_PARTS[n2.text]) {
+        addIssue(issues, { ruleId:'PREP-002', category:'preposition', confidence:'high', start:t.start, end:n2.end, errorText:text.slice(t.start, n2.end), message:'"at the ' + n2.text + '" 应用 in the ' + n2.text + '（at 用于具体时刻）', suggestion:'in the ' + n2.raw });
+      }
+      if (w === 'in' && nx && (WEEKDAYS[nx.text] || nx.text === 'weekend' || (nx.text === 'the' && n2 && n2.text === 'weekend'))) {
+        var dEnd = nx.text === 'the' ? n2 : nx;
+        addIssue(issues, { ruleId:'PREP-002', category:'preposition', confidence:'high', start:t.start, end:dEnd.end, errorText:text.slice(t.start, dEnd.end), message:'星期与周末用 on（英式也可用 at the weekend），不能用 in', suggestion:'on ' + dEnd.raw.replace(/^the\s+/i, 'the ') });
+      }
+      if ((w === 'on' || w === 'at') && nx && SEASONS[nx.text]) {
+        addIssue(issues, { ruleId:'PREP-002', category:'preposition', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'季节前用 in（"in summer"），不用 ' + w, suggestion:'in ' + nx.raw });
+      }
+      if ((w === 'on' || w === 'at') && nx && /^(1[6-9]|20)\d{2}$/.test(nx.text)) {
+        addIssue(issues, { ruleId:'PREP-002', category:'preposition', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'年份前用 in（"in 2019"），不用 ' + w, suggestion:'in ' + nx.raw });
+      }
+      // PREP-003 despite of → despite
+      if (w === 'despite' && nx && nx.text === 'of') {
+        addIssue(issues, { ruleId:'PREP-003', category:'preposition', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'despite 本身即介词，后面不加 of（"despite of" 是错误形式）', suggestion:'despite' });
+      }
+      // PREP-004 according 后缺 to
+      if (w === 'according' && nx && nx.text !== 'to') {
+        addIssue(issues, { ruleId:'PREP-004', category:'preposition', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'"according" 不能单独作介词，应用 according to', suggestion:'according to' });
+      }
+      // PREP-005 since + 时间段 → for
+      if (w === 'since') {
+        var d5 = null, d5i = -1;
+        for (var q5 = i + 1; q5 <= i + 3 && q5 < n; q5++) {
+          var t5 = tokens[q5];
+          if (DURATION_UNITS[t5.text]) { d5 = t5; d5i = q5; break; }
+          if (/^\d+$/.test(t5.text) || NUM_WORDS[t5.text] !== undefined || /^(a|an|the|several|many|few|couple|of|about|over|almost|nearly)$/.test(t5.text)) continue;
+          break;
+        }
+        var a5 = d5i >= 0 ? tok(tokens, d5i + 1) : null;
+        if (d5 && !(a5 && a5.text === 'ago')) {
+          addIssue(issues, { ruleId:'PREP-005', category:'preposition', confidence:'high', start:t.start, end:d5.end, errorText:text.slice(t.start, d5.end), message:'since 后接时间点，表示一段时间应用 for', suggestion:'for ' + d5.raw });
+        }
+      }
+      // PREP-006 固定短语误用介词
+      if (w === 'in' && nx && nx.text === 'the' && n2 && n2.text === 'other' && n3 && n3.text === 'hand') {
+        addIssue(issues, { ruleId:'PREP-006', category:'preposition', confidence:'high', start:t.start, end:n3.end, errorText:text.slice(t.start, n3.end), message:'固定短语应为 "on the other hand"', suggestion:'on the other hand' });
+      }
+      if (w === 'in' && nx && nx.text === 'the' && n2 && n2.text === 'internet') {
+        addIssue(issues, { ruleId:'PREP-006', category:'preposition', confidence:'high', start:t.start, end:n2.end, errorText:text.slice(t.start, n2.end), message:'网络空间用介词 on："on the Internet"', suggestion:'on the ' + n2.raw });
+      }
+      // PREP-007 形容词/副词 + 误用介词
+      if (nx && ADJ_PREP_ERR[w + ' ' + nx.text]) {
+        addIssue(issues, { ruleId:'PREP-007', category:'preposition', confidence:'mid', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'"' + t.raw + '" 不与 ' + nx.raw + ' 搭配，应用 ' + ADJ_PREP_ERR[w + ' ' + nx.text], suggestion:t.raw + ' ' + ADJ_PREP_ERR[w + ' ' + nx.text] });
+      }
+      // NOUN-005 数量词与名词可数性不一致
+      if (/^(many|few)$/.test(w) && nx && UNCOUNTABLE[nx.text] && !PLURAL_OK[nx.text] && !hasTag(nx, 'Plural') && !looksPlural(nx.text) && !IRREG_PLURAL[nx.text] && !MASS_SKIP[nx.text]) {
+        var fix5 = w === 'many' ? 'much' : 'little';
+        addIssue(issues, { ruleId:'NOUN-005', category:'noun', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'"' + nx.raw + '" 是不可数名词，不能用 ' + w + ' 修饰', suggestion:fix5 + ' ' + nx.raw });
+      }
+      if (w === 'much' && nx && strictPluralTok(nx)) {
+        addIssue(issues, { ruleId:'NOUN-005', category:'noun', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'可数复数名词用 many 修饰，不能用 much', suggestion:'many ' + nx.raw });
+      }
+      if (w === 'less' && nx && strictPluralTok(nx)) {
+        addIssue(issues, { ruleId:'NOUN-005', category:'noun', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'可数名词用 fewer 表示"更少"，less 用于不可数名词', suggestion:'fewer ' + nx.raw });
+      }
+      if (/^amounts?$/.test(w) && nx && nx.text === 'of' && n2 && strictPluralTok(n2)) {
+        addIssue(issues, { ruleId:'NOUN-005', category:'noun', confidence:'mid', start:t.start, end:n2.end, errorText:text.slice(t.start, n2.end), message:'可数名词用 a number of，a large amount of 用于不可数名词', suggestion:'number of ' + n2.raw });
+      }
+      if (w === 'number' && nx && nx.text === 'of' && n2 && UNCOUNTABLE[n2.text] && !PLURAL_OK[n2.text] && !looksPlural(n2.text)) {
+        addIssue(issues, { ruleId:'NOUN-005', category:'noun', confidence:'mid', start:t.start, end:n2.end, errorText:text.slice(t.start, n2.end), message:'不可数名词用 an amount of，a number of 用于可数复数名词', suggestion:'amount of ' + n2.raw });
+      }
+      // NOUN-006 指示词与名词单复数不一致
+      if (/^(these|those)$/.test(w) && nx && singularCountTok(nx)) {
+        addIssue(issues, { ruleId:'NOUN-006', category:'noun', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'"' + w + '" 后接单数名词不通，应改用 ' + (w === 'these' ? 'this' : 'that'), suggestion:(w === 'these' ? 'this ' : 'that ') + nx.raw });
+      }
+      if (w === 'this' && nx && pluralNounish(nx) && (hasAnyTag(nx, ['Noun']) || hasTag(nx, 'PresentTense')) && n2 && /^(are|were|have|do|had|can|could|will|would|should|may|might|must)$/.test(n2.text)) {
+        addIssue(issues, { ruleId:'NOUN-006', category:'noun', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'复数名词前应用 these，不能用 this', suggestion:'these ' + nx.raw });
+      }
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -1513,6 +1691,8 @@
       runSva2(tokens, text, issues);
       runDet(tokens, text, issues);
       runConjAdv(tokens, text, issues);
+      runPronAdj(tokens, text, issues);
+      runPrepNoun(tokens, text, issues);
     }
     return issues;
   }
