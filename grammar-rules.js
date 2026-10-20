@@ -1205,6 +1205,78 @@
     }
   }
 
+  // EMP-001~005 强调句（It is/was … that/who）与句首否定/only 的部分倒装
+  var NEG_ADV = {never:1,seldom:1,rarely:1,hardly:1,scarcely:1,little:1,nowhere:1};
+  var ONLY_ADV = {then:1,when:1,later:1,once:1,afterwards:1,recently:1};
+  var PAST_TIME = {yesterday:1,last:1,ago:1,formerly:1};
+  var CONNECT_SET = /^(that|who|which|where|when|why|how|whom)$/;
+  function runEmp(tokens, text, issues) {
+    var n = tokens.length;
+    for (var i = 0; i < n; i++) {
+      var w = tokens[i].text, nx = tok(tokens, i + 1);
+      // 强调句结构：It is/was …
+      if (w === 'it' && nx && /^(is|was)$/i.test(nx.text)) {
+        var sid0 = tokens[i].sentence;
+        var k = i + 2, person = false, prep = false, whichTok = null;
+        for (var j = k; j < Math.min(k + 5, n); j++) {
+          var tj = tokens[j];
+          if (tj.sentence !== sid0) break;
+          if (tj.text === 'which') { whichTok = tj; break; }
+          if (CONNECT_SET.test(tj.text)) break;
+          if (hasAnyTag(tj, ['ProperNoun']) || /^(i|you|he|she|we|they)$/.test(tj.text)) person = true;
+          if (hasAnyTag(tj, ['Preposition']) || PREPS[tj.text]) prep = true;
+        }
+        // EMP-001 指人应用 who/that；状语焦点应用 that
+        if (whichTok && person) addIssue(issues, { ruleId:'EMP-001', category:'emphatic', confidence:'high', start:whichTok.start, end:whichTok.end, errorText:whichTok.raw, message:'强调句中先行词指人时应用 who/that，不用 which', suggestion:'who / that' });
+        else if (whichTok && prep) addIssue(issues, { ruleId:'EMP-001', category:'emphatic', confidence:'mid', start:whichTok.start, end:whichTok.end, errorText:whichTok.raw, message:'强调句中被强调部分是时间/地点等状语时应用 that，不用 which', suggestion:'that' });
+        // EMP-002 缺少连接词 that/who（只在同一句内扫描；遇不定式补语即停）
+        var seenNP = false, conn = false, vTok = null;
+        for (var j2 = k; j2 < Math.min(k + 7, n); j2++) {
+          var t2 = tokens[j2];
+          if (t2.sentence !== sid0) break;
+          if (t2.text === 'to' || hasTag(t2, 'Infinitive')) break;
+          if (CONNECT_SET.test(t2.text)) { conn = true; break; }
+          if (isDeterminer(t2) || hasAnyTag(t2, ['Noun', 'ProperNoun', 'Number', 'Adjective', 'Preposition']) || PREPS[t2.text]) { seenNP = true; continue; }
+          if (MODALS[t2.text] || /^(am|is|are|was|were|have|has|had|do|does|did)$/.test(t2.text)) { vTok = t2; break; }
+          if (hasAnyTag(t2, ['Verb']) && !hasTag(t2, 'Gerund')) { vTok = t2; break; }
+        }
+        if (!conn && seenNP && vTok) addIssue(issues, { ruleId:'EMP-002', category:'emphatic', confidence:'mid', start:tokens[i].start, end:vTok.end, errorText:text.slice(tokens[i].start, vTok.end).slice(0, 40), message:'强调句 It is/was … that/who … 缺少连接词', suggestion:'在从句谓语前补 that / who' });
+        // EMP-003 仅在 It is + 过去时间副词时提示（It was 与 not until 均不判）
+        if (/^is$/i.test(nx.text)) {
+          var q3 = i + 2;
+          if (tokens[q3] && tokens[q3].text === 'not') q3++;
+          var t3 = tok(tokens, q3);
+          if (t3 && PAST_TIME[t3.text]) {
+            addIssue(issues, { ruleId:'EMP-003', category:'emphatic', confidence:'mid', start:tokens[i].start, end:nx.end, errorText:nx.raw, message:'强调过去的时间/事件应用 It was … that …，不用 It is', suggestion:'was' });
+          }
+        }
+      }
+      // EMP-004 句首否定副词 / only + 状语 → 主句部分倒装
+      var atStart = tokens[i].start === 0 || /[.!?]\s*$/.test(text.slice(0, tokens[i].start));
+      if (atStart && (NEG_ADV[w] || w === 'only')) {
+        var s = i + 1;
+        if (w === 'only') {
+          if (!(tokens[s] && hasAnyTag(tokens[s], ['Adverb']) && ONLY_ADV[tokens[s].text])) continue;
+          s++;
+        }
+        var subj = tokens[s];
+        if (subj && (hasAnyTag(subj, ['Pronoun']) || hasAnyTag(subj, ['Noun'])) && !hasAnyTag(subj, ['Verb'])) {
+          var vv = tok(tokens, s + 1);
+          if (vv && (MODALS[vv.text] || AUX_SET[vv.text] || hasAnyTag(vv, ['Verb']))) {
+            addIssue(issues, { ruleId:'EMP-004', category:'inversion', confidence:'high', start:tokens[i].start, end:subj.end, errorText:text.slice(tokens[i].start, subj.end), message:'否定词/only 置于句首时主句要部分倒装（助动词提到主语前）', suggestion:w + ' + 助动词 + 主语' });
+          }
+        }
+      }
+      // EMP-005 the reason is because
+      if (w === 'because') {
+        var pv1 = prevIdx(tokens, i), pv2 = pv1 >= 0 ? prevIdx(tokens, pv1) : -1;
+        if (pv1 >= 0 && /^(is|was)$/i.test(tokens[pv1].text) && pv2 >= 0 && tokens[pv2].text === 'reason') {
+          addIssue(issues, { ruleId:'EMP-005', category:'emphatic', confidence:'high', start:tokens[pv2].start, end:tokens[i].end, errorText:text.slice(tokens[pv2].start, tokens[i].end), message:'"the reason is because" 冗余，应用 "the reason is that"', suggestion:'that' });
+        }
+      }
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -1233,6 +1305,7 @@
       runFrag2(tokens, text, issues);
       runVerb2(tokens, text, issues);
       runPunc(tokens, text, issues);
+      runEmp(tokens, text, issues);
     }
     return issues;
   }
