@@ -1061,7 +1061,8 @@
       for (var k = 0; k < words.length; k++) {
         var tk = words[k];
         if (MODALS[tk.text] || /^(am|is|are|was|were|be|been|being|have|has|had)$/.test(tk.text)) { hasPred = true; break; }
-        if (hasAnyTag(tk, ['Verb']) && !hasTag(tk, 'Gerund') && hasAnyTag(tk, ['PastTense', 'PresentTense'])) { hasPred = true; break; }
+        if (hasAnyTag(tk, ['Verb']) && hasAnyTag(tk, ['PastTense', 'PresentTense', 'Infinitive', 'Modal'])) { hasPred = true; break; }
+        if (/(ed|s)$/i.test(tk.text) && tk.text.length > 2) { hasPred = true; break; } // rose/degrees/species 常被误标名词，避免误判残句
       }
       if (!hasPred) {
         var f = words[0], lw = words[words.length - 1];
@@ -1159,6 +1160,51 @@
     }
   }
 
+  // PUNC-001~006 英文标点：全角标点、标点后/前空格、句末缺空格、重复标点、括号空格
+  var CJK_PUNC = /[，。、；：？！（）《》「」『』【】]/g;
+  var ABBR_SET = {eg:1,ie:1,etc:1,vs:1,no:1,fig:1,ref:1,al:1,us:1,uk:1,st:1,dr:1,mr:1,mrs:1,ms:1,prof:1,vol:1,pp:1,ed:1,eds:1,ca:1,cf:1,approx:1,incl:1,min:1,max:1,jan:1,feb:1,mar:1,apr:1,jun:1,jul:1,aug:1,sep:1,sept:1,oct:1,nov:1,dec:1,ltd:1,inc:1,univ:1};
+  function runPunc(tokens, text, issues) {
+    var m;
+    // PUNC-001 全角中文标点
+    CJK_PUNC.lastIndex = 0;
+    while ((m = CJK_PUNC.exec(text)) !== null) {
+      if (m.index === CJK_PUNC.lastIndex) CJK_PUNC.lastIndex++;
+      addIssue(issues, { ruleId:'PUNC-001', category:'punctuation', confidence:'mid', start:m.index, end:m.index + 1, errorText:m[0], message:'英文写作应使用半角标点，"' + m[0] + '" 是全角中文标点', suggestion:'改用半角标点' });
+    }
+    // PUNC-002 逗号/分号/冒号后缺空格
+    var re2 = /([,;:])(?=[A-Za-z0-9])/g;
+    while ((m = re2.exec(text)) !== null) {
+      var p2 = m.index;
+      if (/\d/.test(text.charAt(p2 - 1)) && /\d/.test(text.charAt(p2 + 1))) continue; // 1,000 千分位
+      addIssue(issues, { ruleId:'PUNC-002', category:'punctuation', confidence:'high', start:p2, end:p2 + 1, errorText:m[1], message:'"' + m[1] + '" 后应有一个空格', suggestion:m[1] + ' ' });
+    }
+    // PUNC-003 标点前多余空格
+    var re3 = /([ \t]+)([,.;:!?])/g;
+    while ((m = re3.exec(text)) !== null) {
+      addIssue(issues, { ruleId:'PUNC-003', category:'punctuation', confidence:'high', start:m.index, end:m.index + m[0].length, errorText:m[0], message:'标点 "' + m[2] + '" 前不应有空格', suggestion:m[2] });
+    }
+    // PUNC-004 句号后缺空格（排除小数、缩写、首字母缩写）
+    var re4 = /\.(?=[A-Z])/g;
+    while ((m = re4.exec(text)) !== null) {
+      var p4 = m.index;
+      if (/\d/.test(text.charAt(p4 - 1))) continue;
+      var w4 = (text.slice(0, p4).match(/([A-Za-z.]+)$/) || ['', ''])[1];
+      var lw = w4.replace(/\./g, '').toLowerCase();
+      if (ABBR_SET[lw] || lw.length < 2) continue;
+      addIssue(issues, { ruleId:'PUNC-004', category:'punctuation', confidence:'mid', start:p4, end:p4 + 1, errorText:'.', message:'句号后应有一个空格再开始下一句', suggestion:'. ' });
+    }
+    // PUNC-005 重复标点
+    var re5 = /([,;:])\1+|([!?])\2+|(?<!\.)\.\.(?!\.)/g;
+    while ((m = re5.exec(text)) !== null) {
+      addIssue(issues, { ruleId:'PUNC-005', category:'punctuation', confidence:'mid', start:m.index, end:m.index + m[0].length, errorText:m[0], message:'标点重复："' + m[0] + '"', suggestion:'保留一个标点' });
+    }
+    // PUNC-006 括号两侧空格
+    var re6 = /([A-Za-z])\(|\(\s/g;
+    while ((m = re6.exec(text)) !== null) {
+      addIssue(issues, { ruleId:'PUNC-006', category:'punctuation', confidence:'mid', start:m.index, end:m.index + m[0].length, errorText:m[0], message:m[0].indexOf('(') === 0 ? '左括号后不应有空格' : '英文左括号前应有一个空格', suggestion:'( 与内容之间加空格' });
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -1186,6 +1232,7 @@
       runExtra2(tokens, text, issues);
       runFrag2(tokens, text, issues);
       runVerb2(tokens, text, issues);
+      runPunc(tokens, text, issues);
     }
     return issues;
   }
