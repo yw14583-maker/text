@@ -68,7 +68,7 @@
   var SUPERLATIVE = {best:1,worst:1,fastest:1,biggest:1,smallest:1,largest:1,highest:1,lowest:1,greatest:1,easiest:1,hardest:1,strongest:1,cheapest:1,richest:1,poorest:1,oldest:1,youngest:1,longest:1,shortest:1,earliest:1,latest:1,deepest:1,widest:1,heaviest:1,closest:1,nicest:1,safest:1};
   // 语义重复（冗余）搭配：错误 → 精简后
   var REDUNDANT = {'repeat again':'repeat','return back':'return','advance forward':'advance','past history':'history','new innovation':'innovation','free gift':'gift','basic fundamentals':'fundamentals','unexpected surprise':'surprise','reverse back':'reverse','merge together':'merge','still remains':'remains','mutual cooperation':'cooperation','repeat once again':'repeat'};
-  var PHYS_S = /^(news|maths|math|physics|economics|ethics|statistics|politics|linguistics|electronics)$/;
+  var PHYS_S = /^(news|maths|math|mathematics|physics|economics|ethics|statistics|politics|linguistics|electronics|genetics|athletics|gymnastics|measles|rabies)$/;
   var SOUND_AN = {hour:1,honest:1,honor:1,honour:1,heir:1};
   var SOUND_A = {university:1,unique:1,united:1,uniform:1,universal:1,user:1,european:1,one:1,once:1,useful:1,union:1,unit:1,use:1};
   var MODALS = {can:1,could:1,may:1,might:1,must:1,shall:1,should:1,will:1,would:1,wo:1,'won\'t':1,cannot:1,do:1,does:1,did:1};
@@ -564,7 +564,7 @@
     for (var c = 0; c + 1 < n; c++) {
       if (!COLLECTIVE[tokens[c].text]) continue;
       var vc = tokens[c + 1];
-      if (!/^(is|are|was|were)$/.test(vc.text)) continue;
+      if (!/^(are|were)$/.test(vc.text)) continue; // is/was 属正常用法，不提示
       addIssue(issues, { ruleId:'SVA-008', category:'sva', confidence:'low', start:tokens[c].start, end:tokens[c].end, errorText:tokens[c].raw, message:'集合名词 ' + tokens[c].raw + '：强调整体用单数(is)，强调成员用复数(are)，按语义选择', suggestion:'is / are 视语义而定' });
       break;
     }
@@ -986,7 +986,7 @@
     for (var i = 0; i < n; i++) {
       var t = tokens[i], w = t.text, nx = tok(tokens, i + 1), pv = prevNonEmpty(tokens, i);
       // QUA-005 some/most/many/few/several/none/either/neither + the → 缺 of
-      if (/^(some|most|many|few|several|none|either|neither)$/.test(w) && nx && nx.text === 'the') {
+      if (/^(some|most|many|few|several|none)$/.test(w) && nx && nx.text === 'the') {
         addIssue(issues, { ruleId:'QUA-005', category:'quantifier', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'"' + w + ' the" 之间缺少 of，应用 "' + w + ' of the"', suggestion:w + ' of the' });
       }
       // NF-006 for to do
@@ -1277,6 +1277,115 @@
     }
   }
 
+  // SVA-009~012 主谓一致补充：of 短语中心词、定语从句隔开、以 -s 结尾的国名
+  var QUANT_SING_HEAD = {amount:1,list:1,series:1,kind:1,type:1,sort:1,sum:1};
+  var QUANT_PLURAL_HEAD = {lot:1,lots:1,variety:1,couple:1,handful:1,majority:1,minority:1,rest:1,plenty:1};
+  function svaVerbKind(tk) {
+    if (!tk) return '';
+    if (/^(is|was|has|does)$/i.test(tk.text)) return 'sing';
+    if (/^(are|were|have|do)$/i.test(tk.text)) return 'plural';
+    if (!hasAnyTag(tk, ['Verb']) || hasAnyTag(tk, ['Gerund', 'Infinitive'])) return '';
+    if (hasTag(tk, 'PastTense') || /ed$/i.test(tk.text)) return ''; // 过去式无 -s 一致问题
+    return /[^s]s$/i.test(tk.text) ? 'sing' : 'plural';
+  }
+  function headPlural(t) { return (isPlural(t) || hasTag(t, 'Plural') || looksPlural(t.text) || IRREG_PLURAL[t.text]) ? true : false; }
+  function verbKindText(v) {
+    v = v.toLowerCase();
+    if (/^(is|was|has|does)$/.test(v)) return 'sing';
+    if (/^(are|were|have|do)$/.test(v)) return 'plural';
+    if (/ed$/.test(v)) return '';
+    return /[^s]s$/.test(v) ? 'sing' : 'plural';
+  }
+  function headPluralText(h) {
+    h = h.toLowerCase();
+    if (IRREG_PLURAL[h]) return true;
+    if (PHYS_S.test(h)) return false;
+    if (/(ss|us|is|ics)$/.test(h)) return false;
+    return /[^s]s$/.test(h);
+  }
+  function runSva2(tokens, text, issues) {
+    var n = tokens.length;
+    for (var i = 1; i < n; i++) {
+      if (tokens[i].text !== 'of') continue;
+      var h = null, hIdx = -1;
+      for (var a = i - 1; a >= Math.max(0, i - 4); a--) {
+        var ta = tokens[a];
+        if (hasAnyTag(ta, ['Noun', 'ProperNoun'])) { h = ta; hIdx = a; break; }
+        if (isDeterminer(ta) || hasAnyTag(ta, ['Adjective', 'Adverb'])) continue;
+        break;
+      }
+      if (!h) continue;
+      var j = i + 1, obj = null;
+      for (; j < Math.min(i + 5, n); j++) {
+        var tj = tokens[j];
+        if (tj.sentence !== h.sentence) break;
+        if (isDeterminer(tj) || hasAnyTag(tj, ['Adjective'])) continue;
+        if (hasAnyTag(tj, ['Noun', 'ProperNoun'])) obj = tj;
+        break;
+      }
+      if (!obj) continue;
+      var v = null;
+      for (var k = j + 1; k < Math.min(j + 3, n); k++) {
+        var tk = tokens[k];
+        if (tk.sentence !== h.sentence) break;
+        if (MODALS[tk.text]) break;
+        v = tk; break;
+      }
+      if (!v) continue;
+      var hw = h.text, det = tokens[hIdx - 1] ? tokens[hIdx - 1].text : '';
+      var preHead = null;
+      for (var a3 = hIdx - 1; a3 >= Math.max(0, hIdx - 3); a3--) {
+        if (hasAnyTag(tokens[a3], ['Adjective', 'Adverb'])) continue;
+        preHead = tokens[a3]; break;
+      }
+      var expPlural;
+      if (hw === 'number') expPlural = /^(a|an)$/i.test(det) ? true : false;
+      else if (QUANT_SING_HEAD[hw] || PHYS_S.test(hw)) expPlural = false;
+      else if (QUANT_PLURAL_HEAD[hw]) { if (/^(a|an)$/i.test(det)) expPlural = true; else continue; }
+      else {
+        // 中心词必须由限定词/物主代词直接限定；"with higher level of education were" 这类 PP 内的 of 短语不判
+        if (!(preHead && (isDeterminer(preHead) || hasAnyTag(preHead, ['Possessive'])))) continue;
+        expPlural = headPlural(h);
+      }
+      if (UNCOUNTABLE[obj.text]) expPlural = false;
+      var kind = svaVerbKind(v);
+      if (!kind || (kind === 'plural') === expPlural) continue;
+      addIssue(issues, { ruleId:'SVA-009', category:'sva', confidence:'mid', start:v.start, end:v.end, errorText:v.raw, message:'主语中心词是 "' + h.raw + '"（' + (expPlural ? '复数' : '单数') + '），谓语应与之保持一致', suggestion:expPlural ? '改用复数谓语' : '改用单数谓语' });
+    }
+    // SVA-011 定语从句隔开的主谓一致（逗号不是 token，故基于文本匹配）
+    var re11 = /([A-Za-z]+)\s*,\s*(?:which|who|whose)\b[^,.;!?]{0,60},\s*([A-Za-z]+)/g, m11;
+    while ((m11 = re11.exec(text)) !== null) {
+      var headW = m11[1], verbW = m11[2], kind3 = verbKindText(verbW);
+      if (!kind3) continue;
+      var plu3 = headPluralText(headW);
+      if ((kind3 === 'plural') === plu3) continue;
+      var vPos = m11.index + m11[0].lastIndexOf(verbW);
+      // 该位置必须是主句谓语：其后应直接接宾语（限定词/代词/专有名词）或结束，排除并列列表（drive, roll, and swim）
+      var rest = text.slice(vPos + verbW.length);
+      var mm2 = rest.match(/^\s*([A-Za-z]+)/);
+      if (mm2 && /ly$/.test(mm2[1])) mm2 = rest.slice(mm2[0].length).match(/^\s*([A-Za-z]+)/);
+      var nxt = mm2 ? mm2[1] : '';
+      var okNext = /^(a|an|the|this|that|these|those|its|their|his|her|our|your|my|no|not|more|less|fewer|such|another|each|every|both|all|some|many|most|it|them|him|us|me|you)$/i.test(nxt) || /^[A-Z]/.test(nxt);
+      if (!okNext && !/^\s*[.;!?]/.test(rest)) continue;
+      addIssue(issues, { ruleId:'SVA-011', category:'sva', confidence:'mid', start:vPos, end:vPos + verbW.length, errorText:verbW, message:'主语 "' + headW + '" 被定语从句隔开，谓语应保持' + (plu3 ? '复数' : '单数') + '一致', suggestion:plu3 ? '改用复数谓语' : '改用单数谓语' });
+    }
+    // SVA-013 each/one/either/neither + of + 复数名词 → 谓语用单数
+    for (var q = 0; q + 4 < n; q++) {
+      if (!/^(each|one|either|neither)$/.test(tokens[q].text)) continue;
+      if (tokens[q + 1].text !== 'of') continue;
+      var vq = tok(tokens, q + 4);
+      if (!vq || svaVerbKind(vq) !== 'plural') continue;
+      addIssue(issues, { ruleId:'SVA-013', category:'sva', confidence:'high', start:vq.start, end:vq.end, errorText:vq.raw, message:'"' + tokens[q].text + ' of …" 的中心词为单数，谓语应用单数形式', suggestion:'改用单数谓语' });
+    }
+    // SVA-012 以 -s 结尾的国名/机构名视为单数
+    for (var i3 = 0; i3 + 2 < n; i3++) {
+      if (!/^united$/i.test(tokens[i3].text)) continue;
+      if (!/^(states|nations|kingdom)$/i.test(tokens[i3 + 1].text)) continue;
+      var v3 = tok(tokens, i3 + 2);
+      if (v3 && /^(are|were)$/.test(v3.text)) addIssue(issues, { ruleId:'SVA-012', category:'sva', confidence:'high', start:tokens[i3].start, end:v3.end, errorText:text.slice(tokens[i3].start, v3.end), message:'the United States/Nations 视为单数，谓语应用 is/was', suggestion:'is' });
+    }
+  }
+
   function runAll(text) {
     if (!text) return [];
     var tokens = tokenize(text);
@@ -1306,6 +1415,7 @@
       runVerb2(tokens, text, issues);
       runPunc(tokens, text, issues);
       runEmp(tokens, text, issues);
+      runSva2(tokens, text, issues);
     }
     return issues;
   }
