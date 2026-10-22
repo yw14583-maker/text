@@ -8,475 +8,37 @@
   'use strict';
   if (!global) return;
 
-  function hasTag(t, tag) { return t.tags.indexOf(tag) !== -1; }
-  function hasAnyTag(t, list) { for (var i = 0; i < list.length; i++) if (t.tags.indexOf(list[i]) !== -1) return true; return false; }
-  function isNoun(t) { return hasAnyTag(t, ['Noun']); }
-  function isProperNoun(t) { return hasTag(t, 'ProperNoun'); }
-  function isPlural(t) { return hasTag(t, 'Plural'); }
-  function isSingular(t) { return hasTag(t, 'Singular'); }
-  // 复数后缀启发式：s/x 结尾且非常见单数名词/不可数名词，视为复数
-  function looksPlural(w) { w = (w || '').toLowerCase(); if (!/[sx]$/i.test(w)) return false; if (PHYS_S.test(w)) return false; if (UNCOUNTABLE[w]) return false; return true; }
-  // 可数名词复数：带 Plural 标签且非不可数/s 结尾单数
-  function isCountPlural(t) { return hasTag(t, 'Plural') && !UNCOUNTABLE[t.text] && !PHYS_S.test(t.text); }
-  // 统计 [a,b) 字符区间内的有限谓语（一般现在/过去，非动名词）数量
-  function finCount(tokens, a, b) { var c = 0; for (var i = 0; i < tokens.length; i++) { var t = tokens[i]; if (t.start < a || t.start >= b) continue; if (hasTag(t, 'Verb') && (hasTag(t, 'PresentTense') || hasTag(t, 'PastTense')) && !hasTag(t, 'Gerund')) c++; } return c; }
-  function isFiniteVerb(t) { return hasTag(t, 'Verb') && (hasTag(t, 'PresentTense') || hasTag(t, 'PastTense')) && !hasTag(t, 'Gerund'); }
-  // 更严格的"有限实义动词"：排除分词/形容词式的 -ed/-ing、动名词、不定式与名词同形词
-  function plainFinite(t) { return hasTag(t, 'Verb') && (hasTag(t, 'PresentTense') || hasTag(t, 'PastTense')) && !hasAnyTag(t, ['Gerund', 'PastPart', 'Participle', 'Infinitive', 'Noun']) && !/(ed|ing)$/i.test(t.text); }
-  // [a,b) 区间内是否构成"主语 + 有限谓词"的独立从句
-  function hasClause(tokens, a, b) {
-    for (var i = 0; i < tokens.length; i++) {
-      var t = tokens[i]; if (t.start < a || t.start >= b) continue;
-      if (!plainFinite(t)) continue;
-      for (var q = i - 1; q >= 0; q--) { var p = tokens[q]; if (p.start < a) break; if (hasAnyTag(p, ['Noun', 'Pronoun']) && !hasAnyTag(p, ['Verb'])) return true; if (p.text === ',' || p.text === ';') break; }
-    }
-    return false;
-  }
+  var GC = global.GrammarChecker;
+  if (!GC || !GC.pipeline) throw new Error('GrammarChecker 核心层未加载：请先引入 grammar-checker/ 下的 dictionaries 与 core 脚本');
+  var D = GC.dict, T = GC.tok, M = GC.morph;
+  var addIssue = GC.pipeline.addIssue, register = GC.pipeline.register;
 
-  var UNCOUNTABLE = {water:1,milk:1,juice:1,oil:1,rice:1,bread:1,sugar:1,salt:1,food:1,money:1,information:1,knowledge:1,advice:1,research:1,evidence:1,progress:1,news:1,furniture:1,equipment:1,baggage:1,luggage:1,traffic:1,weather:1,work:1,software:1,pollution:1,nature:1,literature:1,music:1,education:1,math:1,mathematics:1,physics:1,behaviour:1,behavior:1,'homework':1,'meat':1,'beef':1,'pork':1,'chicken':1,'fish':1,'toast':1,noise:1,damage:1,feedback:1,transport:1,transportation:1,accommodation:1,advertising:1,employment:1,rain:1,snow:1,warmth:1,darkness:1,oxygen:1,hydrogen:1,training:1,housework:1,machinery:1,scenery:1,poetry:1,merchandise:1,offspring:1,cattle:1,rubbish:1,garbage:1,funding:1};
-  // a/an 之后不应误判为缺限定词单数名词的词（代词宾格、地点/时间副词、指示词等）
-  var NOUN_SKIP = {him:1,her:1,them:1,us:1,me:1,you:1,here:1,there:1,now:1,then:1,it:1,this:1,that:1,these:1,those:1,each:1,every:1};
-  var MEASURE_WORDS = {cup:1,glass:1,piece:1,bottle:1,box:1,group:1,lot:1,number:1,variety:1,range:1,kind:1,type:1,bit:1,loaf:1,slice:1,bowl:1,bag:1,packet:1,pair:1,set:1,liter:1,litre:1,kilo:1,grain:1,drop:1};
-  var UNIQUE_NOUNS = {sun:1,moon:1,world:1,internet:1};
-  // 名词/动词同形且易歧义的词，ART-002（缺冠词）不判定
-  var NOUN_VERB_HOMO = {rise:1,fall:1,grow:1,matter:1,help:1,hope:1,change:1,remain:1,differ:1,increase:1,decrease:1,decline:1,report:1,study:1,work:1,damage:1,rose:1,risen:1,fell:1,fallen:1,grew:1,grown:1,drew:1,drawn:1,threw:1,thrown:1};
-  // each/every 等不可直接修饰的不可数抽象名词
-  var EACH_NOUN = {information:1,advice:1,knowledge:1,research:1,evidence:1,progress:1,equipment:1,furniture:1,homework:1,news:1,feedback:1};
-  // 限定词（含物主代词）：二者不能连用
-  var POSS_DET = {my:1,your:1,his:1,her:1,its:1,our:1,their:1};
-  var CENTRAL_DET = {the:1,a:1,an:1,this:1,these:1,those:1,some:1,any:1,no:1,every:1,each:1,another:1,neither:1,either:1};
-  // 口语叹词（学术写作不宜）
-  var INTERJECTION = {oh:1,wow:1,oops:1,whoa:1,yay:1,hurrah:1,hooray:1,gosh:1,gee:1,ouch:1,yikes:1,hmm:1,uh:1,um:1,hey:1,yeah:1,yep:1,nope:1,hi:1};
-  var COUNTRY_OK = {'united states':1,'united kingdom':1,us:1,usa:1,uk:1};
-  // 官方/惯用名称本就带 the（避免 ART-006 误判）
-  var THE_OK = {netherlands:1,philippines:1,maldives:1,seychelles:1,bahamas:1,alps:1,andes:1,himalayas:1,rockies:1};
-  // 本就该带 the 的专有名称特征词（河流/海洋/山脉/方位/共和国等），ART-006 放行
-  var GEO_THE = {river:1,rivers:1,ocean:1,oceans:1,sea:1,seas:1,gulf:1,bay:1,strait:1,canal:1,lake:1,lakes:1,mountain:1,mountains:1,desert:1,valley:1,coast:1,peninsula:1,island:1,islands:1,republic:1,kingdom:1,union:1,federation:1,emirates:1,states:1,region:1,north:1,south:1,east:1,west:1,hague:1,earth:1};
-  // 「the + 名词」为正常用法、但常被 compromise 误标为专有名词的词，ART-006 放行
-  var COMMON_NOUN_WHITELIST = {police:1,government:1,public:1,staff:1,audience:1,crew:1,masses:1,majority:1,company:1,team:1,model:1,method:1,approach:1,study:1,paper:1,article:1,report:1,result:1,data:1,analysis:1,survey:1,system:1,project:1,university:1,college:1,school:1,hospital:1,city:1,country:1,world:1,internet:1,market:1,industry:1,technology:1,energy:1,health:1,table:1,figure:1,chapter:1,students:1,teacher:1,teachers:1,researcher:1,researchers:1,participants:1,respondents:1,author:1,authors:1,journal:1,bank:1,firm:1,sector:1,group:1,region:1};
-  var INDEF = {everyone:1,everybody:1,someone:1,somebody:1,anyone:1,anybody:1,nobody:1,nothing:1,everything:1};
-  var COLLECTIVE = {family:1,team:1,class:1,group:1,committee:1,staff:1,audience:1,government:1,public:1,crew:1};
-  var ORDINALS = {first:1,second:1,third:1,fourth:1,fifth:1,sixth:1,seventh:1,eighth:1,ninth:1,tenth:1};
-  var SPORTS = {football:1,basketball:1,soccer:1,baseball:1,tennis:1,golf:1,chess:1,volleyball:1,badminton:1,swimming:1,skiing:1,hockey:1,rugby:1,cricket:1};
-  // 不可数名词的复数形式在特定语境下合法，NOUN-001 放行
-  var PLURAL_OK = {waters:1,oils:1,foods:1,sugars:1,salts:1,moneys:1,monies:1,works:1,behaviours:1,behaviors:1,maths:1,peoples:1,fishes:1,damages:1};
-  // 本身无动词用法、复数形式必错的不可数名词（即使被误标为 Verb 也判错）
-  var NOUN_STRICT = {information:1,advice:1,equipment:1,knowledge:1,furniture:1,baggage:1,luggage:1,software:1,homework:1,pollution:1};
-  // 后接不定式(to do)的常见动词：漏 to 时报错
-  var TO_VERBS = {want:1,hope:1,decide:1,plan:1,expect:1,agree:1,refuse:1,pretend:1,offer:1,learn:1,manage:1,choose:1,afford:1,attempt:1,intend:1,deserve:1,promise:1};
-  // 动名词还原为原形时的补 e 例外
-  var GERUND_E = {mak:'make',tak:'take',us:'use',writ:'write',driv:'drive',hav:'have',giv:'give',com:'come',bec:'become',mov:'move',choos:'choose',los:'lose',car:'care',shar:'share',hop:'hope',danc:'dance',fac:'face',decid:'decide',improv:'improve',includ:'include',provid:'provide',achiev:'achieve',compar:'compare',creat:'create',increas:'increase',reduc:'reduce',produc:'produce',introduc:'introduce',agre:'agree',manag:'manage',prepar:'prepare',explor:'explore',requir:'require',deserv:'deserve',refus:'refuse',pretend:'pretend',arriv:'arrive',advanc:'advance',merg:'merge',revers:'reverse',combin:'combine',emphasiz:'emphasize',criticiz:'criticize',recogniz:'recognize',realiz:'realize',summariz:'summarize',organiz:'organize',minimiz:'minimize',analyz:'analyze',paralyz:'paralyze'};
-  // 固定搭配：错误搭配 → 正确形式（'' 表示去掉该介词）
-  var V_PREP_RULE = {'depend of':'on','reply of':'to','arrive to':'at','discuss about':'','emphasize on':'','marry with':'','mention about':''};
-  var N_PREP_RULE = {'solution of':'to','reason of':'for','answer of':'to','key of':'to'};
-  // 比较级词表：其后的 then 应为 than
-  var COMPARATIVE = {more:1,less:1,fewer:1,greater:1,higher:1,lower:1,bigger:1,smaller:1,better:1,worse:1,other:1,rather:1,earlier:1,later:1,longer:1,shorter:1,larger:1,faster:1,slower:1,older:1,younger:1,easier:1,stronger:1,weaker:1,cheaper:1,richer:1,poorer:1,harsher:1,harder:1,deeper:1,wider:1,heavier:1,closer:1,nicer:1,safer:1};
-  // 最高级词表：其前的 most 冗余
-  var SUPERLATIVE = {best:1,worst:1,fastest:1,biggest:1,smallest:1,largest:1,highest:1,lowest:1,greatest:1,easiest:1,hardest:1,strongest:1,cheapest:1,richest:1,poorest:1,oldest:1,youngest:1,longest:1,shortest:1,earliest:1,latest:1,deepest:1,widest:1,heaviest:1,closest:1,nicest:1,safest:1};
-  // 语义重复（冗余）搭配：错误 → 精简后
-  var REDUNDANT = {'repeat again':'repeat','return back':'return','advance forward':'advance','past history':'history','new innovation':'innovation','free gift':'gift','basic fundamentals':'fundamentals','unexpected surprise':'surprise','reverse back':'reverse','merge together':'merge','still remains':'remains','mutual cooperation':'cooperation','repeat once again':'repeat'};
-  var PHYS_S = /^(news|maths|math|mathematics|physics|economics|ethics|statistics|politics|linguistics|electronics|genetics|athletics|gymnastics|measles|rabies)$/;
-  var SOUND_AN = {hour:1,honest:1,honor:1,honour:1,heir:1};
-  var SOUND_A = {university:1,unique:1,united:1,uniform:1,universal:1,user:1,european:1,one:1,once:1,useful:1,union:1,unit:1,use:1};
-  var MODALS = {can:1,could:1,may:1,might:1,must:1,shall:1,should:1,will:1,would:1,wo:1,'won\'t':1,cannot:1,do:1,does:1,did:1};
-  var IRREG_PP = {been:1,seen:1,gone:1,done:1,met:1,taken:1,written:1,broken:1,chosen:1,spoken:1,fell:1,known:1,driven:1,eaten:1,run:1,come:1,become:1,found:1,held:1,kept:1,left:1,made:1,said:1,told:1,thought:1,shown:1,built:1,bought:1,caught:1,bring:1,brought:1,felt:1,heard:1,hit:1,understood:1,put:1,read:1,risen:1,sent:1,sung:1,stood:1,taught:1,won:1,been:1};
-  // 一般现在时第三单的不规则形式
-  var IRREG_S3 = {be:'is',have:'has',has:'has',do:'does',does:'does',go:'goes',watch:'watches',teach:'teaches',reach:'reaches',catch:'catches',pass:'passes',fix:'fixes',box:'boxes'};
-  // 复数谓语还原为原形的不规则映射
-  var IRREG_BASE = {is:'be',are:'be',was:'be',were:'be',has:'have',does:'do'};
-  var INNER_WORDS = {'together with':1,'along with':1,'as well as':1,including:1};
-  var DETERMINERS = {the:1,a:1,an:1,this:1,that:1,these:1,those:1,my:1,your:1,his:1,her:1,its:1,our:1,their:1,some:1,any:1,each:1,every:1,no:1,both:1,all:1,several:1,'another':1,'other':1};
-  var POSSESSIVE = {my:1,your:1,his:1,her:1,its:1,our:1,their:1,whose:1};
-  // 抽象/物质名词：单数形式前常无需冠词，ART-002 放行
-  var ABSTRACT_NOUN = {attention:1,influence:1,health:1,hope:1,biodiversity:1,moral:1,importance:1,significance:1,awareness:1,success:1,failure:1,quality:1,safety:1,growth:1,development:1,access:1,support:1,control:1,responsibility:1,pressure:1,exposure:1};
+  // ---- 词表别名（已迁移至 grammar-checker/dictionaries/）----
+  var UNCOUNTABLE = D.UNCOUNTABLE, PLURAL_OK = D.PLURAL_OK, NOUN_STRICT = D.NOUN_STRICT,
+      EACH_NOUN = D.EACH_NOUN, PHYS_S = D.PHYS_S, NOUN_SKIP = D.NOUN_SKIP, MEASURE_WORDS = D.MEASURE_WORDS,
+      UNIQUE_NOUNS = D.UNIQUE_NOUNS, NOUN_VERB_HOMO = D.NOUN_VERB_HOMO, ABSTRACT_NOUN = D.ABSTRACT_NOUN,
+      COLLECTIVE = D.COLLECTIVE, SPORTS = D.SPORTS, ORDINALS = D.ORDINALS,
+      COUNTRY_OK = D.COUNTRY_OK, THE_OK = D.THE_OK, GEO_THE = D.GEO_THE, COMMON_NOUN_WHITELIST = D.COMMON_NOUN_WHITELIST,
+      SOUND_AN = D.SOUND_AN, SOUND_A = D.SOUND_A,
+      MODALS = D.MODALS, DETERMINERS = D.DETERMINERS, POSSESSIVE = D.POSSESSIVE, POSS_DET = D.POSS_DET,
+      CENTRAL_DET = D.CENTRAL_DET, INDEF = D.INDEF, INTERJECTION = D.INTERJECTION, INNER_WORDS = D.INNER_WORDS,
+      COMPARATIVE = D.COMPARATIVE, SUPERLATIVE = D.SUPERLATIVE, REDUNDANT = D.REDUNDANT,
+      PREPS = D.PREPS, V_PREP_RULE = D.V_PREP_RULE, N_PREP_RULE = D.N_PREP_RULE, ADJ_PREP_ERR = D.ADJ_PREP_ERR,
+      IRREG_PP = D.IRREG_PP, IRREG_S3 = D.IRREG_S3, IRREG_BASE = D.IRREG_BASE,
+      IRREG_PLURAL = D.IRREG_PLURAL, PLURAL_IRREG = D.PLURAL_IRREG,
+      PAST_TO_PP = D.PAST_TO_PP, PAST_BASE = D.PAST_BASE, PP_FROM_BASE = D.PP_FROM_BASE,
+      TO_VERBS = D.TO_VERBS, GERUND_E = D.GERUND_E;
 
-  function vowelSound(w) { if (SOUND_AN[w]) return true; if (SOUND_A[w]) return false; return /^[aeiou]/i.test(w); }
-
-  // ---------------- 分词 ----------------
-  function tokenize(text) {
-    var out = [];
-    if (!global.nlp) {
-      var re = /[A-Za-z'-]+/g, m;
-      while ((m = re.exec(text)) !== null) {
-        out.push({ text: m[0].toLowerCase(), raw: m[0], start: m.index, end: m.index + m[0].length, tags: [], sentence: 0 });
-      }
-      return out;
-    }
-    var json = global.nlp(text).json({ terms: true, tags: true, offset: true });
-    var s = -1;
-    (json || []).forEach(function (sent) {
-      s++;
-      (sent.terms || []).forEach(function (t) {
-        var st = 0, ln = (t.text || '').length;
-        if (t.offset) { st = Array.isArray(t.offset) ? t.offset[0] : (t.offset.start || 0); ln = Array.isArray(t.offset) ? t.offset[1] : (t.offset.length || 0); }
-        var raw = text.slice(st, st + ln);
-        out.push({ text: raw.toLowerCase(), raw: raw, start: st, end: st + ln, tags: t.tags || [], sentence: s });
-      });
-    });
-    return out;
-  }
-
-  function tok(tokens, i) { return i >= 0 && i < tokens.length ? tokens[i] : null; }
-  // 常见固定搭配白名单：落在命中区间内的规则判定一律放行，避免把地道搭配误判为错误
-  var FIXED_PHRASES = [
-    'used to', 'be used to', 'get used to',
-    'take effect', 'takes effect', 'took effect', 'taking effect', 'taken effect',
-    'come into effect', 'came into effect', 'bring into effect', 'in effect',
-    'into account', 'take into account', 'takes into account', 'took into account', 'taking into account', 'taken into account',
-    'account for', 'accounts for', 'accounted for', 'accounting for',
-    'take part in', 'took part in', 'takes part in', 'taking part in',
-    'take place', 'took place', 'takes place', 'taking place',
-    'make progress', 'made progress', 'makes progress', 'making progress',
-    'play a role in', 'plays a role in', 'played a role in', 'playing a role in', 'play an important role in',
-    'pay attention to', 'pays attention to', 'paid attention to', 'paying attention to',
-    'in terms of', 'in addition to', 'in spite of', 'in contrast to', 'in line with',
-    'in general', 'in particular', 'in fact', 'in advance', 'in short', 'in brief',
-    'at present', 'at least', 'at most', 'at the same time',
-    'on average', 'on the other hand', 'on the whole', 'on behalf of',
-    'by contrast', 'by means of', 'by no means',
-    'as a result of', 'as a whole', 'as well as', 'as a matter of fact',
-    'for example', 'for instance', 'for the sake of',
-    'due to', 'owing to', 'thanks to', 'according to', 'regardless of',
-    'apart from', 'instead of', 'rather than', 'in case of', 'in favor of',
-    'with regard to', 'with respect to', 'in accordance with', 'in relation to',
-    'be based on', 'is based on', 'are based on', 'was based on', 'were based on',
-    'be related to', 'is related to', 'are related to',
-    'be consistent with', 'is consistent with', 'are consistent with',
-    'be responsible for', 'is responsible for', 'are responsible for',
-    'be interested in', 'is interested in', 'are interested in',
-    'be capable of', 'is capable of', 'are capable of',
-    'be likely to', 'is likely to', 'are likely to',
-    'be applied to', 'is applied to', 'are applied to',
-    'be committed to', 'is committed to', 'are committed to',
-    'look forward to', 'looks forward to', 'looking forward to', 'looked forward to',
-    'succeed in', 'succeeds in', 'succeeded in',
-    'carry out', 'carried out', 'carries out', 'carrying out',
-    'focus on', 'focuses on', 'focused on', 'focusing on',
-    'refer to', 'refers to', 'referred to', 'referring to',
-    'lead to', 'leads to', 'led to', 'leading to',
-    'result in', 'results in', 'resulted in', 'resulting in',
-    'contribute to', 'contributes to', 'contributed to', 'contributing to',
-    'depend on', 'depends on', 'depended on', 'depending on',
-    'rely on', 'relies on', 'relied on', 'relying on',
-    'lie in', 'lies in', 'lay in',
-    'such as', 'so that', 'no doubt', 'no longer', 'no matter'
-  ];
-  var PROTECT_RANGES = [];
-  function buildProtectRanges(text) {
-    PROTECT_RANGES = [];
-    for (var i = 0; i < FIXED_PHRASES.length; i++) {
-      var words = FIXED_PHRASES[i].split(/\s+/).map(function (w) { return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
-      var re = new RegExp('\\b' + words.join('[\\s\\-]+') + '\\b', 'gi');
-      var m;
-      while ((m = re.exec(text)) !== null) { PROTECT_RANGES.push([m.index, m.index + m[0].length]); if (m.index === re.lastIndex) re.lastIndex++; }
-    }
-  }
-  function isProtected(a, b) {
-    // 仅当问题区间完全落在固定搭配区间内才放行（避免 "is depend" 这类相邻错误被短语白名单连带屏蔽）
-    for (var i = 0; i < PROTECT_RANGES.length; i++) { var r = PROTECT_RANGES[i]; if (a >= r[0] && b <= r[1]) return true; }
-    return false;
-  }
-  function addIssue(issues, o) {
-    // 固定搭配白名单：命中区间内一律放行；但主谓一致/助动词类规则的落点是动词本身，
-    // 会被 "is consistent with" 这类短语整体吞掉，故这两类不过白名单
-    var exempt = o.category === 'sva' || o.category === 'auxiliary';
-    if (!exempt && isProtected(o.start || 0, o.end || 0)) return;
-    // 仅去掉同一规则在同一位置的重复提示；同一规则在不同位置可分别报出
-    for (var i = 0; i < issues.length; i++) {
-      if (issues[i].ruleId === o.ruleId && issues[i].start === (o.start || 0) && issues[i].end === (o.end || 0)) return;
-    }
-    issues.push({ start: o.start || 0, end: o.end || 0, errorText: o.errorText || '', message: o.message, suggestion: o.suggestion || '', ruleId: o.ruleId, category: o.category, confidence: o.confidence });
-  }
-  // 主语词性判定
-  function classifySubject(t) {
-    var w = t.text;
-    if (hasTag(t, 'Gerund')) return null; // 动名词短语作主语时单复数判定不可靠
-    if (w === 'he' || w === 'she' || w === 'it') return { plural: false, third: true, name: w };
-    if (w === 'they' || w === 'we' || w === 'those' || w === 'these') return { plural: true, third: false, name: w };
-    if (w === 'i' || w === 'you') return null; // 非三单，不判定
-    if (isNoun(t) && (!isProperNoun(t) || IRREG_PLURAL[w] || looksPlural(w))) { var p = isPlural(t) || IRREG_PLURAL[w] || (looksPlural(w) && !hasTag(t, 'Singular')); return { plural: p, third: !p, name: w }; }
-    return null;
-  }
-  var PREPS = {of:1,in:1,on:1,at:1,by:1,for:1,with:1,about:1,from:1,into:1,after:1,before:1,between:1,under:1,during:1,through:1,without:1,along:1,across:1,among:1,against:1,around:1,over:1,up:1,down:1,as:1,than:1};
-  // 判断 tokens[k] 是否是介词短语的宾语（向左越过限定词能找到介词）
-  function isPPObject(tokens, k) {
-    for (var j = k - 1; j >= Math.max(0, k - 3); j--) {
-      var t = tokens[j];
-      if (hasTag(t, 'Preposition') || PREPS[t.text]) return true;
-      if (isDeterminer(t) || hasAnyTag(t, ['Number', 'Value', 'Cardinal', 'Adjective'])) continue;
-      break;
-    }
-    return false;
-  }
-  // 取动词左边最近的主体（跳过副词/限定词/介词短语宾语）；若跨过定语从句则取从句先行词
-  function subjectBefore(tokens, idx, text) {
-    var sid = tokens[idx] ? tokens[idx].sentence : 0;
-    var lo = 0; // 左边界
-    for (var k = idx - 1; k >= 0; k--) {
-      var t = tokens[k];
-      if (t.sentence !== sid) { lo = k + 1; break; } // 跨句 → 只在当前句内找主语，避免取到上一句的名词
-      if (t.text === ',' || t.text === ';' || t.text === '.' || t.text === 'and' || t.text === 'or' || t.text === 'but' || t.text === 'then' || t.text === 'to') { lo = k + 1; break; }
-      if (MODALS[t.text]) return null;
-      lo = k;
-    }
-    // 若区间内含关系代词 → 主语判定不可靠，跳过
-    for (var q = idx - 1; q >= lo; q--) {
-      if (/^(who|whom|whose|which|that)$/.test(tokens[q].text)) return null;
-    }
-    var skippedPPObj = false;
-    for (var r = idx - 1; r >= lo; r--) {
-      var tt = tokens[r];
-      if (tt.sentence !== sid) break;
-      if (text && /[([]\s*$/.test(text.slice(0, tt.start))) continue; // 括号内的缩写（如 (IAS)）不作主语
-      if (hasAnyTag(tt, ['Adverb'])) continue;
-      if (tt.text === 'there') continue;
-      if (t.text === 'not' || tt.text === 'also' || tt.text === 'always' || tt.text === 'often' || tt.text === 'never' || tt.text === 'usually' || tt.text === 'however') continue;
-      if (isDeterminer(tt)) { if (skippedPPObj) continue; return null; } // 已越过 PP 宾语时，其限定词可跳过（the results of the experiment is）
-      if (hasTag(tt, 'Preposition') || PREPS[tt.text]) { if (skippedPPObj) continue; return null; } // 已越过 PP 宾语时继续向左找中心词（the results of the experiment is）
-      var cl = classifySubject(tt);
-      if (cl) {
-        if (isPPObject(tokens, r)) { skippedPPObj = true; continue; }
-        // 越过 of 短语宾语后找到的中心词：仅当其为复数时才作为主语（the results of the experiment is），
-        // 单数中心词（a large number of X were / an amount of research has）属正常用法，不判
-        if (skippedPPObj && !cl.plural) return null;
-        // 候选主语前若出现谓词（they had morning classes was…）→ 真正主语为更左的中心词，单复数不可判
-        for (var g2 = r - 1; g2 >= Math.max(lo, r - 5); g2--) {
-          var tg = tokens[g2];
-          if (hasAnyTag(tg, ['Gerund', 'Verb']) || /^(am|is|are|was|were|be|been|being|do|does|did|have|has|had|will|would|can|could|may|might|must|should|shall)$/.test(tg.text)) return null;
-          if (isDeterminer(tg) || hasAnyTag(tg, ['Adjective', 'Adverb', 'Noun', 'Number', 'Value', 'Cardinal'])) continue;
-          break;
-        }
-        return cl;
-      }
-    }
-    return null;
-  }
-  function isDeterminer(t) { return DETERMINERS[t.text] || hasTag(t, 'Determiner'); }
-  // 判断动词是否处于不该判错的位子（情态动词/to 之后）。true=跳过不判
-  function verbBlocked(tokens, idx) {
-    for (var k = idx - 1; k >= 0; k--) {
-      var t = tokens[k];
-      if (t.text === ',' || t.text === ';' || t.text === '.' || t.text === 'and' || t.text === 'or' || t.text === 'but') return false; // 子句边界→主谓完整，可判
-      if (MODALS[t.text] || t.text === 'to') return true;          // 情态动词/to 表原形，不判
-      if (hasAnyTag(t, ['Adverb'])) continue;
-      if (t.text === 'not' || t.text === 'also' || t.text === 'always' || t.text === 'often' || t.text === 'never' || t.text === 'usually' || t.text === 'however') continue;
-      if (isDeterminer(t)) continue;
-      return false;                                                 // 已见主体/其它词，可判
-    }
-    return false;
-  }
-
-  // ---------------- 冠词 ----------------
-  function runArt(tokens, text, issues) {
-    var n = tokens.length;
-    // ART-001 a/an 发音
-    for (var i = 0; i < n; i++) {
-      var art = tokens[i].text;
-      if (art !== 'a' && art !== 'an') continue;
-      var nx = tok(tokens, i + 1);
-      if (!nx || !/[A-Za-z]/.test(nx.text)) continue;
-      var needAn = vowelSound(nx.text);
-      if (art === 'a' && needAn) addIssue(issues, { ruleId:'ART-001', category:'article', confidence:'high', start:tokens[i].start, end:nx.end, errorText:text.slice(tokens[i].start, nx.end), message:'a/an 由后面单词发音首音决定：元音音素开头用 an', suggestion:'an ' + nx.raw });
-      else if (art === 'an' && !needAn && !/^[a-z]/i.test(nx.text)) continue;
-      else if (art === 'an' && !needAn) addIssue(issues, { ruleId:'ART-001', category:'article', confidence:'high', start:tokens[i].start, end:nx.end, errorText:text.slice(tokens[i].start, nx.end), message:'a/an 由后面单词发音首音决定：辅音音素开头用 a', suggestion:'a ' + nx.raw });
-    }
-    // ART-003 a/an + 不可数/复数
-    for (var j = 0; j < n; j++) {
-      if (tokens[j].text !== 'a' && tokens[j].text !== 'an') continue;
-      var na = tok(tokens, j + 1);
-      if (!na || !/[A-Za-z]/.test(na.text)) continue;
-      var n2 = tok(tokens, j + 2);
-      if (na.text === 'of' || (MEASURE_WORDS[na.text] && n2 && n2.text === 'of')) continue;
-      if (n2 && hasAnyTag(n2, ['Noun', 'Adjective']) && !hasAnyTag(n2, ['Verb'])) continue; // 名词/形容词作定语：an information design experiment、a focus group
-      if (UNCOUNTABLE[na.text]) addIssue(issues, { ruleId:'ART-003', category:'article', confidence:'high', start:tokens[j].start, end:na.end, errorText:text.slice(tokens[j].start,na.end), message:'a/an 只能修饰单数可数名词，"' + na.raw + '" 是不可数名词', suggestion:na.raw });
-      else if ((isPlural(na) || (isNoun(na) && looksPlural(na.text))) && !hasTag(na, 'Singular')) addIssue(issues, { ruleId:'ART-003', category:'article', confidence:'high', start:tokens[j].start, end:na.end, errorText:text.slice(tokens[j].start,na.end), message:'a/an 只能修饰单数可数名词，复数名词不能直接加 a/an', suggestion:na.raw });
-    }
-    // ART-002 单数可数名词缺限定词（仅限"有限实义动词 + 裸单数名词"的高置信宾语位置）
-    for (var k = 1; k < n; k++) {
-      var t = tokens[k];
-      if (!isNoun(t) || isProperNoun(t)) continue;
-      if (hasAnyTag(t, ['Pronoun', 'Possessive']) || POSSESSIVE[t.text]) continue; // their/its/my 等
-      if (isPlural(t) || hasTag(t, 'Uncountable')) continue;
-      if (isDeterminer(t) || UNCOUNTABLE[t.text] || NOUN_SKIP[t.text] || ABSTRACT_NOUN[t.text]) continue;
-      var prev = tok(tokens, k - 1);
-      if (!prev) continue;
-      if (prev.sentence !== t.sentence) continue; // 跨句的词不作谓语（多篇拼接时曾误报句首名词）
-      if (isDeterminer(prev) || hasAnyTag(prev, ['Possessive', 'Pronoun'])) continue;
-      // 必须是有限实义动词；排除 be 动词与分词/形容词式的 -ed/-ing、动名词、不定式
-      if (!(hasAnyTag(prev, ['Verb']) && (hasTag(prev, 'PresentTense') || hasTag(prev, 'PastTense')))) continue;
-      if (hasAnyTag(prev, ['Noun', 'Pronoun'])) continue; // prev 同时可作名词（prices rise）→ 视为主语，不判为谓语后缺冠词
-      if (hasAnyTag(prev, ['Gerund', 'Infinitive', 'Participle']) || hasTag(prev, 'Copula')) continue;
-      if (/(ed|ing)$/i.test(prev.text)) continue;
-      if (MODALS[prev.text] || /^(do|does|did|be|am|is|are|was|were|will|might|being|been)$/i.test(prev.text)) continue; // 纯助动词/情态后接的是动词（have/has/had 可作实义动词，不排除）
-      if (NOUN_VERB_HOMO[t.text]) continue; // 名词/动词同形词（rise/fall/matter…）歧义过大，不在此规则判定
-      var nxn = tok(tokens, k + 1);
-      if (hasAnyTag(t, 'Verb') && nxn && hasTag(nxn, 'Adverb')) continue; // "动词 + 副词"（rise sharply）
-      if (nxn && hasAnyTag(nxn, ['Noun', 'ProperNoun']) && !hasAnyTag(nxn, ['Verb'])) continue; // 名词作定语（climate change）
-      if (/^(school|bed|work|home|hospital|prison|church|foot|hand|heart|top|bottom|breakfast|lunch|dinner|once|twice|night|sunday|monday|tuesday|wednesday|thursday|friday|saturday|january|february|march|april|june|july|august|september|october|november|december)$/.test(t.text)) continue;
-      if (SPORTS[t.text]) continue; // play football/basketball 等运动名词不加冠词
-      // 习语局部上下文放行（go to school / at home / by bus ...）
-      var ctx = text.slice(Math.max(0, t.start - 18), t.end + 4).toLowerCase();
-      if (/(go to school|go to work|go to bed|at home|at work|by bus|by car|by train|by plane|by bike|to school|to work|in bed|at night|on foot|at lunch|take part|took part|take care|took care|pay attention|played?\s+(football|basketball|soccer|baseball|tennis|golf|chess|volleyball|badminton))/i.test(ctx)) continue;
-      addIssue(issues, { ruleId:'ART-002', category:'article', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'单数可数名词 "' + t.raw + '" 前需要冠词(a/an/the)或限定词', suggestion:'the/a ' + t.raw });
-    }
-    // ART-004 抽象固定搭配误用 the（仅限「介词 + the + 名词」这一泛指框架，避免 the work/the room 这类确指被误报）
-    for (var a4 = 1; a4 < n; a4++) {
-      if (tokens[a4 - 1].text !== 'the') continue;
-      if (!/^(school|bed|work|hospital|prison|church|home|college|university)$/.test(tokens[a4].text)) continue;
-      if (!PREPS[tokens[a4 - 2] ? tokens[a4 - 2].text : '']) continue;
-      var nx4 = tok(tokens, a4 + 1);
-      if (nx4 && /[A-Za-z]/.test(nx4.text) && hasAnyTag(nx4, ['Noun', 'Adjective']) && !hasAnyTag(nx4, ['Verb'])) continue; // 名词作定语
-      addIssue(issues, { ruleId:'ART-004', category:'article', confidence:'mid', start:tokens[a4 - 1].start, end:tokens[a4].end, errorText:text.slice(tokens[a4 - 1].start, tokens[a4].end), message:'抽象固定搭配（上学/住院等）表泛指时不加 the；确指某建筑物实体才加 the', suggestion:'去掉 the' });
-    }
-    // ART-005 独一无二名词缺 the
-    for (var u = 0; u < n; u++) {
-      if (!UNIQUE_NOUNS[tokens[u].text]) continue;
-      if (text.charAt(tokens[u].start - 1) === '-' || text.charAt(tokens[u].end) === '-') continue; // real-world 等复合词
-      var pb = tok(tokens, u - 1);
-      var pt = pb ? pb.text : '';
-      if (pt === 'the' || pt === 'a' || pt === 'an') continue; // 仅确指限定词放行；in/of/on world 仍应加 the
-      var pb2 = tok(tokens, u - 2);
-      if (pb && pb2 && hasAnyTag(pb, ['Adjective', 'Adverb']) && isDeterminer(pb2)) continue; // the modern world
-      addIssue(issues, { ruleId:'ART-005', category:'article', confidence:'high', start:tokens[u].start, end:tokens[u].end, errorText:tokens[u].raw, message:'sun/moon/world/internet 等独一无二事物前需加定冠词 the', suggestion:'the ' + tokens[u].raw });
-    }
-    // ART-006 专有名词错误加 the
-    for (var p = 0; p + 1 < n; p++) {
-      if (tokens[p].text !== 'the') continue;
-      var nm = tokens[p + 1];
-      if (COMMON_NOUN_WHITELIST[nm.text]) continue; // the police/government/public... 属正常用法，放行
-      if (hasTag(nm, 'Organization')) continue; // 机构/组织名词（company/university...）被误标专有，放行
-      if (!isProperNoun(nm)) continue;
-      // 收集连续专有名词（最多 3 个）构成名称短语：United States / Yangtze River / Global South
-      var ph = [nm.text], phEnd = nm.end;
-      for (var q = p + 2; q < n && ph.length < 3; q++) {
-        if (!isProperNoun(tokens[q])) break;
-        ph.push(tokens[q].text); phEnd = tokens[q].end;
-      }
-      var phStr = ph.join(' ');
-      if (COUNTRY_OK[nm.text] || COUNTRY_OK[phStr] || THE_OK[nm.text] || THE_OK[phStr]) continue;
-      var geoT = false;
-      for (var g = 0; g < ph.length; g++) if (GEO_THE[ph[g]]) { geoT = true; break; }
-      if (geoT) continue; // 河/海/山脉/方位/共和国等本就用 the，放行
-      if (PHYS_S.test(nm.text) || UNCOUNTABLE[nm.text]) continue; // news/physics 等常见专有误标放行
-      addIssue(issues, { ruleId:'ART-006', category:'article', confidence:'high', start:tokens[p].start, end:phEnd, errorText:text.slice(tokens[p].start, phEnd), message:'人名/单个国家名称前不加 the，应直接写 "' + phStr + '"', suggestion:phStr });
-    }
-    // ART-007 序数词缺 the（中）
-    for (var o = 1; o < n; o++) {
-      if (!ORDINALS[tokens[o].text]) continue;
-      var po = tok(tokens, o - 1);
-      if (po && isDeterminer(po)) continue;
-      var no = tok(tokens, o + 1);
-      if (no && hasAnyTag(no, ['Noun']) && !hasTag(no, 'Plural')) addIssue(issues, { ruleId:'ART-007', category:'article', confidence:'mid', start:tokens[o].start, end:tokens[o].end, errorText:tokens[o].raw, message:'序数词表顺序“第…”时一般加 the（"a first" 表“又一次”除外）', suggestion:'the ' + tokens[o].raw });
-    }
-  }
-
-  // ---------------- 时态 ----------------
-  function runTen(tokens, text, issues) {
-    var n = tokens.length;
-    var pastAdv = /(^|[\s.,])yesterday($|[\s.,])/i.test(text) || /\blast\s+\w+\b/i.test(text) || /\b\d+\s+ago\b/i.test(text) || /\bin\s+(19|20)\d{2}\b/i.test(text);
-    var futureAdv = /\btomorrow\b/i.test(text) || /\bnext\s+(week|month|year|monday|tuesday|day|weekend)\b/i.test(text) || /\bin the future\b/i.test(text);
-    var nowAdv = /\bnow\b/.test(text);
-    var canary = /\bsaid\b/.test(text) && /\bfound\b/.test(text) || /\bthe\s+earth\s+goes\b/i.test(text);
-    var sinceMatch = /\bsince\b\s+((19|20)\d{2}|(last|later|childhood|then)\b)/i.exec(text) && !/since\s+then\b/i.test(text);
-
-    if (pastAdv && !/\bsince\b/i.test(text)) { // since + 时间本就用完成时，跳过 TEN-002
-      // TEN-002 现在完成 + 明确过去点
-      var havePP = false;
-      for (var h2 = 0; h2 < n; h2++) {
-        if (tokens[h2].text !== 'have' && tokens[h2].text !== 'has') continue;
-        var pr = tok(tokens, h2 + 1);
-        if (!pr) continue;
-        if (hasAnyTag(pr, ['PastPart', 'PastTense']) || IRREG_PP[pr.text]) {
-          // 与过去时间点被并列连词隔开（was introduced in 2019 and has been…）属不同从句，不判
-          var ym = /\bin\s+((?:19|20)\d{2})\b/i.exec(text);
-          if (ym) { var midT = text.slice(ym.index, tokens[h2].start); if (/\b(and|but)\b|;/.test(midT)) continue; }
-          // 完成时 + for + 时间段（has been in effect for five years）属正常用法，不判
-          if (/\bfor\s+(?:a\s+|an\s+)?(?:\d+|several|many|few|two|three|four|five|six|seven|eight|nine|ten|decades?|years?|months?|weeks?|days?|hours?|centuries|century)\b/i.test(text.slice(pr.end))) continue;
-          havePP = true;
-          addIssue(issues, { ruleId:'TEN-002', category:'tense', confidence:'high', start:tokens[h2].start, end:pr.end, errorText:text.slice(tokens[h2].start, pr.end), message:'现在完成时(has/have done)不能搭配明确过去时间点，请改用一般过去式', suggestion:'改为一般过去式' });
-          break;
-        }
-      }
-      // TEN-001 过去时间状语 + 一般现在时谓语
-      if (!canary && !havePP && !sinceMatch) {
-        for (var i = 0; i < n; i++) {
-          var t = tokens[i];
-          if (MODALS[t.text]) continue;
-          if (hasAnyTag(t, ['Noun']) || UNCOUNTABLE[t.text] || ABSTRACT_NOUN[t.text]) continue; // 名词同形/不可数/抽象名词不作谓语
-          var tnx = tok(tokens, i + 1);
-          if (tnx && hasAnyTag(tnx, ['Noun']) && !hasAnyTag(tnx, ['Verb'])) continue; // 名词作定语（work experience）
-          if (!hasAnyTag(t, ['Verb','Infinitive'])) continue;
-          if (hasTag(t, 'PastTense') || hasTag(t, 'FutureTense') || hasTag(t, 'PastPart') || hasTag(t, 'Gerund')) continue;
-          if (/^(am|is|are|was|were|have|has|had|do|does|did|will|would|can|could|may|might|must|shall|should)$/i.test(t.text)) continue;
-          if (verbBlocked(tokens, i)) continue;
-          addIssue(issues, { ruleId:'TEN-001', category:'tense', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'句中有过去时间状语(yesterday/last week)，谓语应使用一般过去式', suggestion:t.raw + ' → 过去式' });
-          break;
-        }
-      }
-    }
-    if (futureAdv && !canary) {
-      for (var f = 0; f < n; f++) {
-        var tf = tokens[f];
-        if (!hasTag(tf, 'PastTense')) continue;
-        if (verbBlocked(tokens, f)) continue;
-        addIssue(issues, { ruleId:'TEN-005', category:'tense', confidence:'high', start:tf.start, end:tf.end, errorText:tf.raw, message:'tomorrow/next week 是将来时间，谓语不能使用过去式', suggestion:'will ' + (PAST_BASE[tf.text] || tf.text) });
-        break;
-      }
-    }
-    // TEN-003 since + 过去时间，主句现在时（中；若已有完成时则本已正确，跳过）
-    if (sinceMatch) {
-      var sm = sinceMatch;
-      var hasPerfect = false;
-      for (var pz = 0; pz < n; pz++) { if (tokens[pz].text === 'has' || tokens[pz].text === 'have') { hasPerfect = true; break; } }
-      if (!hasPerfect) for (var s2 = 0; s2 < n; s2++) {
-        if (tokens[s2].start <= sm.index) continue;
-        if (hasAnyTag(tokens[s2], ['Noun'])) continue;
-        if (/^(is|are)$/i.test(tokens[s2].text)) { // since + 时间 + 现在时 be → 应用 has/have been
-          addIssue(issues, { ruleId:'TEN-003', category:'tense', confidence:'mid', start:tokens[s2].start, end:tokens[s2].end, errorText:tokens[s2].raw, message:'Since + 过去时间表示从过去持续到现在，主句应用现在完成时(has/have been)', suggestion:tokens[s2].text === 'is' ? 'has been' : 'have been' });
-          break;
-        }
-        if (hasAnyTag(tokens[s2], ['Verb','Infinitive']) && !hasTag(tokens[s2],'PastTense') && !hasTag(tokens[s2],'Gerund') && !/(am|is|are|was|were)$/i.test(tokens[s2].text)) {
-          addIssue(issues, { ruleId:'TEN-003', category:'tense', confidence:'mid', start:tokens[s2].start, end:tokens[s2].end, errorText:tokens[s2].raw, message:'Since + 过去时间表示从过去持续到现在，主句常用现在完成时(have/has done)', suggestion:'have/has ' + tokens[s2].raw + ' → 现在完成时' });
-          break;
-        }
-      }
-    }
-    // TEN-004 并列时态跳跃（中）
-    for (var e = 1; e < n - 1; e++) {
-      if (tokens[e].text !== 'and' && tokens[e].text !== 'but') continue;
-      var rv = null, rs = e + 1;
-      if (rs < n && /^(he|she|it|they|we|i|you)$/.test(tokens[rs].text)) rs++; // and + 代词主语（He went home and she cooks）
-      for (var qr = rs; qr < Math.min(rs + 4, n); qr++) {
-        if (tokens[qr].text === ',') break;
-        if (!plainFinite(tokens[qr])) continue;
-        var rvn = tok(tokens, qr + 1);
-        if (rvn && (hasTag(rvn, 'Preposition') || PREPS[rvn.text])) break; // 后接介词 → 实为名词（doubts about）
-        // 右侧候选谓语前必须是主语（名词/代词）：both opportunities and challenges 属并列宾语，不判
-        var preRV = qr > 0 ? tokens[qr - 1] : null;
-        if (!(preRV && (hasAnyTag(preRV, ['Noun', 'Pronoun']) || /^(he|she|it|they|we|i|you)$/.test(preRV.text)))) continue;
-        rv = tokens[qr]; break;
-      }
-      if (!rv) continue;
-      var lv = null;
-      for (var w3 = e - 1; w3 >= Math.max(0, e - 4); w3--) {
-        if (tokens[w3].text === ',' || /^(he|she|it|they|we|i|you)$/.test(tokens[w3].text)) break;
-        if (plainFinite(tokens[w3]) && hasTag(tokens[w3], 'PastTense')) { lv = tokens[w3]; break; }
-      }
-      if (lv && rv) addIssue(issues, { ruleId:'TEN-004', category:'tense', confidence:'mid', start:rv.start, end:rv.end, errorText:rv.raw, message:'并列句连续动作无时间切换，前后时态建议保持一致（前句用过去式）', suggestion:rv.raw + ' → 过去式' });
-    }
-    // TEN-006 now + 一般现在时（低，仅建议；"has/have/had now done" 属正常完成时，跳过）
-    if (nowAdv && !/\b(has|have|had)\s+now\b/i.test(text)) {
-      var ni = text.indexOf('now');
-      for (var nw = 0; nw < n; nw++) {
-        if (tokens[nw].start <= ni) continue;
-        if (hasAnyTag(tokens[nw], ['Verb','Infinitive']) && hasTag(tokens[nw], 'PresentTense') && !/(am|is|are)$/i.test(tokens[nw].text)) {
-          addIssue(issues, { ruleId:'TEN-006', category:'tense', confidence:'low', start:tokens[nw].start, end:tokens[nw].end, errorText:tokens[nw].raw, message:'now 常表示此刻正在发生，可考虑用现在进行时(am/is/are doing)', suggestion:'am/is/are ' + tokens[nw].raw + 'ing' });
-          break;
-        }
-      }
-    }
-  }
-
+  // ---- 核心层助手别名（已迁移至 grammar-checker/core/tokenizer.js）----
+  var tokenize = T.tokenize, hasTag = T.hasTag, hasAnyTag = T.hasAnyTag, isNoun = T.isNoun,
+      isProperNoun = T.isProperNoun, isPlural = T.isPlural, isSingular = T.isSingular,
+      looksPlural = T.looksPlural, isCountPlural = T.isCountPlural, finCount = T.finCount,
+      isFiniteVerb = T.isFiniteVerb, plainFinite = T.plainFinite, hasClause = T.hasClause,
+      tok = T.tok, prevNonEmpty = T.prevNonEmpty, prevIdx = T.prevIdx, nextReal = T.nextReal,
+      isDeterminer = T.isDeterminer, isPPObject = T.isPPObject,
+      classifySubject = T.classifySubject, subjectBefore = T.subjectBefore, verbBlocked = T.verbBlocked;
+  var gerund = M.gerund, deGerund = M.deGerund, baseFromEd = M.baseFromEd,
+      pluralize = M.pluralize, nounSingular = M.nounSingular, thirdBase = M.thirdBase;
   // ---------------- 主谓一致 ----------------
   function nextHeadNoun(tokens, start) {
     for (var k = start; k < Math.min(start + 3, tokens.length); k++) {
@@ -607,12 +169,8 @@
     }
   }
 
-  var PAST_BASE = {went:'go',saw:'see',had:'have',did:'do',was:'be',were:'be',made:'make',took:'take',came:'come',got:'get',gave:'give',said:'say',told:'tell',thought:'think',found:'find',left:'leave',met:'meet',knew:'know',became:'become',held:'hold',kept:'keep',built:'build',bought:'buy',caught:'catch',taught:'teach',won:'win',broke:'break',wrote:'write',read:'read',ran:'run',felt:'feel',heard:'hear',sent:'send',put:'put',stood:'stand',understood:'understand',drove:'drive',ate:'eat',spoke:'speak',chose:'choose',brought:'bring',spent:'spend',showed:'show',slept:'sleep',drank:'drink',swam:'swim',drew:'draw',flew:'fly',threw:'throw',wore:'wear'};
   function singularize(t) { var w = t.text; if (IRREG_S3[w]) return IRREG_S3[w]; if (/[sx]$/i.test(w) || /ch$|sh$|o$/i.test(w)) return w + 'es'; if (/[bcdfghjklmnpqrstvwxz]y$/i.test(w)) return w.slice(0, -1) + 'ies'; return w + 's'; }
   function pluralStrip(t) { var w = t.text.toLowerCase(); var base = IRREG_BASE[w]; if (base) return base; if (/ies$/i.test(w)) return w.slice(0, -3) + 'y'; if (/ches$|shes$|xes$|zes$|sses$/i.test(w)) return w.slice(0, -2); return w.replace(/s$/i, ''); }
-  function gerund(w) { if (/[^aeiou]e$/i.test(w)) return w.slice(0, -1) + 'ing'; if (/^(run|sit|get|put|begin|stop|swim|plan|drop|refer|prefer|occur|admit|permit)$/i.test(w)) return w + w.slice(-1) + 'ing'; return w + 'ing'; }
-  function deGerund(w) { if (!/ing$/i.test(w)) return w; var s = w.slice(0, -3); if (/([bcdfgklmnprtvz])\1$/i.test(s)) return s.slice(0, -1); if (GERUND_E[s]) return GERUND_E[s]; if (/i$/i.test(s)) return s.slice(0, -1) + 'y'; return s; }
-  function baseFromEd(w) { if (!/ed$/i.test(w)) return w; var s = w.slice(0, -2); if (/([bcdfgklmnprtvz])\1$/i.test(s)) return s.slice(0, -1); if (GERUND_E[s]) return GERUND_E[s]; if (/i$/i.test(s)) return s.slice(0, -1) + 'y'; return s; }
 
   // VERB-001/002 be 动词搭配错误：be + 动词原形 / be + been
   function runVerb(tokens, text, issues) {
@@ -632,15 +190,6 @@
   }
 
   // VERB-004 情态动词后误用非原形（过去式 / 第三人称单数）
-  function thirdBase(w) {
-    if (w === 'goes') return 'go';
-    if (w === 'does') return 'do';
-    if (w === 'has') return 'have';
-    if (w === 'is') return 'be';
-    if (/ies$/i.test(w)) return w.slice(0, -3) + 'y';
-    if (/(ches|shes|sses|xes|zes|oes)$/i.test(w)) return w.slice(0, -2);
-    return w.replace(/s$/i, '');
-  }
   function runModal(tokens, text, issues) {
     for (var i = 0; i + 1 < tokens.length; i++) {
       var t = tokens[i], nx = tokens[i + 1];
@@ -677,16 +226,6 @@
   // 数词后可 legitimately 接单数的计量/时间缩写与单位（3 p.m. / 10 a.m. / 5 kg），NOUN-002 放行
   var UNIT_ABBR = {kg:1,g:1,mg:1,cm:1,mm:1,km:1,m:1,ml:1,l:1,lb:1,oz:1,ft:1,yd:1,mi:1,min:1,sec:1,hr:1,hz:1,khz:1,mhz:1,gb:1,mb:1,kb:1,pm:1,am:1,c:1,'°c':1,'°f':1};
   // 形式与单数相同（或非 -s 结尾）的复数名词，避免误判
-  var IRREG_PLURAL = {people:1,children:1,men:1,women:1,feet:1,teeth:1,mice:1,geese:1,sheep:1,fish:1,deer:1,series:1,species:1,criteria:1,data:1,phenomena:1,media:1,police:1,staff:1,cattle:1,offspring:1};
-  var PLURAL_IRREG = {person:'people',child:'children',man:'men',woman:'women',tooth:'teeth',foot:'feet',mouse:'mice',goose:'geese'};
-  function pluralize(w) {
-    if (PLURAL_IRREG[w]) return PLURAL_IRREG[w];
-    if (/(s|x|z|ch|sh)$/i.test(w)) return w + 'es';
-    if (/[^aeiou]y$/i.test(w)) return w.slice(0, -1) + 'ies';
-    if (/fe$/i.test(w)) return w.slice(0, -2) + 'ves';
-    if (/f$/i.test(w)) return w.slice(0, -1) + 'ves';
-    return w + 's';
-  }
   function runNum(tokens, text, issues) {
     for (var i = 0; i + 1 < tokens.length; i++) {
       var t = tokens[i], nx = tokens[i + 1];
@@ -779,7 +318,6 @@
   }
 
   // CONF-001~005 易混词：its/it's、their/there/they're、then/than、affect/effect、weather/whether
-  function nextReal(tokens, i) { for (var j = i + 1; j < tokens.length; j++) if (tokens[j].text) return tokens[j]; return null; }
   function runConfuse(tokens, text, issues) {
     var n = tokens.length;
     for (var i = 0; i < n; i++) {
@@ -1011,15 +549,6 @@
   // NOUN-003/004、NF-005、PERF-001、CMP-001(词性标签)、CONF-006、COLL-004 补充规则
   var GERUND_VERBS = {enjoy:1,finish:1,avoid:1,mind:1,deny:1,admit:1,risk:1,practise:1,resent:1,quit:1,resist:1,dislike:1,detest:1,postpone:1,keep:1,imagine:1,escape:1,miss:1,mention:1,recall:1,tolerate:1,fancy:1};
   // 简单过去式 ≠ 过去分词 的不规则动词（有同形者不入表，避免误报）
-  var PAST_TO_PP = {went:'gone',saw:'seen',did:'done',took:'taken',came:'come',gave:'given',ate:'eaten',wrote:'written',spoke:'spoken',broke:'broken',chose:'chosen',drove:'driven',ran:'run',swam:'swum',flew:'flown',threw:'thrown',wore:'worn',knew:'known',grew:'grown',drew:'drawn',fell:'fallen',rose:'risen',began:'begun',drank:'drunk',sang:'sung',forgot:'forgotten',froze:'frozen',hid:'hidden',rode:'ridden',rang:'rung',stole:'stolen',woke:'woken',bore:'borne',shook:'shaken',tore:'torn'};
-  function prevNonEmpty(tokens, i) { for (var k = i - 1; k >= 0; k--) { if (tokens[k].text) return tokens[k]; } return null; }
-  function nounSingular(w) {
-    for (var k in PLURAL_IRREG) { if (PLURAL_IRREG[k] === w) return k; }
-    if (/ies$/i.test(w)) return w.slice(0, -3) + 'y';
-    if (/(ches|shes|xes|zes|sses)$/i.test(w)) return w.slice(0, -2);
-    if (/s$/i.test(w)) return w.slice(0, -1);
-    return w;
-  }
   function runExtra(tokens, text, issues) {
     var n = tokens.length;
     for (var i = 0; i < n; i++) {
@@ -1193,8 +722,6 @@
   // 不及物动词各形式（用于 PASS-002：不能用于被动）
   var INTRANS = {happen:1,happens:1,happened:1,occur:1,occurs:1,occurred:1,arise:1,arises:1,arose:1,arisen:1,die:1,dies:1,died:1,appear:1,appears:1,appeared:1,arrive:1,arrives:1,arrived:1,exist:1,exists:1,existed:1,belong:1,belongs:1,belonged:1,emerge:1,emerges:1,emerged:1,vanish:1,vanishes:1,vanished:1,collapse:1,collapses:1,collapsed:1,consist:1,consists:1,consisted:1,seem:1,seems:1,seemed:1,fall:1,falls:1,fell:1,rise:1,rises:1,rose:1,come:1,comes:1,came:1,tumble:1,tumbles:1,tumbled:1,depart:1,departs:1,departed:1};
   // 动词原形 → 过去分词（用于 PASS-003；只收原形与过去分词不同的词）
-  var PP_FROM_BASE = {show:'shown',prove:'proven',write:'written',send:'sent',take:'taken',give:'given',make:'made',do:'done',see:'seen',find:'found',hold:'held',know:'known',break:'broken',choose:'chosen',drive:'driven',eat:'eaten',forget:'forgotten',freeze:'frozen',hide:'hidden',ride:'ridden',ring:'rung',speak:'spoken',steal:'stolen',swim:'swum',throw:'thrown',wear:'worn',wake:'woken',begin:'begun',drink:'drunk',sing:'sung',go:'gone',lie:'lain'};
-  function prevIdx(tokens, i) { for (var k = i - 1; k >= 0; k--) { if (tokens[k].text) return k; } return -1; }
   function ingBase(w) {
     if (!/ing$/i.test(w)) return '';
     var s = w.slice(0, -3), c = [s, s + 'e'];
@@ -1827,43 +1354,15 @@
     }
   }
 
-  function runAll(text) {
-    if (!text) return [];
-    var tokens = tokenize(text);
-    buildProtectRanges(text); // 先标记固定搭配区间，供各规则放行
-    var issues = [];
-    runArt(tokens, text, issues);
-    if (tokens.some(function (t) { return /[a-z]/i.test(t.text); })) {
-      runTen(tokens, text, issues);
-      runSva(tokens, text, issues);
-      runVerb(tokens, text, issues);
-      runModal(tokens, text, issues);
-      runNoun(tokens, text, issues);
-      runNum(tokens, text, issues);
-      runNonfin(tokens, text, issues);
-      runColl(tokens, text, issues);
-      runConfuse(tokens, text, issues);
-      runComp(tokens, text, issues);
-      runClause(tokens, text, issues);
-      runRed(tokens, text, issues);
-      runRel(tokens, text, issues);
-      runRun(tokens, text, issues);
-      runFrag(tokens, text, issues);
-      runPrep(tokens, text, issues);
-      runExtra(tokens, text, issues);
-      runExtra2(tokens, text, issues);
-      runFrag2(tokens, text, issues);
-      runVerb2(tokens, text, issues);
-      runPunc(tokens, text, issues);
-      runEmp(tokens, text, issues);
-      runSva2(tokens, text, issues);
-      runDet(tokens, text, issues);
-      runConjAdv(tokens, text, issues);
-      runPronAdj(tokens, text, issues);
-      runPrepNoun(tokens, text, issues);
-    }
-    return issues;
-  }
+  // ---- 规则注册（顺序与既有流水线完全一致）----
+  register(runSva); register(runVerb); register(runModal); register(runNoun); register(runNum);
+  register(runNonfin); register(runColl); register(runConfuse); register(runComp); register(runClause);
+  register(runRed); register(runRel); register(runRun); register(runFrag); register(runPrep);
+  register(runExtra); register(runExtra2); register(runFrag2); register(runVerb2); register(runPunc);
+  register(runEmp); register(runSva2); register(runDet); register(runConjAdv); register(runPronAdj);
+  register(runPrepNoun);
 
-  global.GrammarRules = { runAll: runAll, tokenize: tokenize };
+  // 对外 API：app.js 仍调用 window.GrammarRules.runAll
+  global.GrammarRules = { runAll: GC.pipeline.runAll, tokenize: GC.tok.tokenize };
+
 })(typeof window !== 'undefined' ? window : null);

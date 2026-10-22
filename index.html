@@ -72,9 +72,19 @@
     </div>
 </div>
 
-<script src="text-pos.js?v=20261020a"></script>
-<script src="grammar-rules.js?v=20261020a"></script>
-<script src="app.js?v=20261020a"></script>
+<script src="text-pos.js?v=20261022a"></script>
+
+<!-- grammar-checker：词表层 → 核心层 → 规则层 → 残余规则 -->
+<script src="grammar-checker/dictionaries/uncountables.js?v=20261022a"></script>
+<script src="grammar-checker/dictionaries/prepositions.js?v=20261022a"></script>
+<script src="grammar-checker/dictionaries/irregularities.js?v=20261022a"></script>
+<script src="grammar-checker/core/tokenizer.js?v=20261022a"></script>
+<script src="grammar-checker/core/protector.js?v=20261022a"></script>
+<script src="grammar-checker/core/pipeline.js?v=20261022a"></script>
+<script src="grammar-checker/rules/article.js?v=20261022a"></script>
+<script src="grammar-checker/rules/tense.js?v=20261022a"></script>
+<script src="grammar-rules.js?v=20261022a"></script>
+<script src="app.js?v=20261022a"></script>
 
 </body>
 </html>
