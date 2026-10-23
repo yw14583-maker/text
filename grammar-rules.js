@@ -39,13 +39,99 @@
       classifySubject = T.classifySubject, subjectBefore = T.subjectBefore, verbBlocked = T.verbBlocked;
   var gerund = M.gerund, deGerund = M.deGerund, baseFromEd = M.baseFromEd,
       pluralize = M.pluralize, nounSingular = M.nounSingular, thirdBase = M.thirdBase;
-  // ---------------- 主谓一致 ----------------
-  function nextHeadNoun(tokens, start) {
-    for (var k = start; k < Math.min(start + 3, tokens.length); k++) {
-      if (isNoun(tokens[k]) || INDEF[tokens[k].text]) return tokens[k];
-    }
-    return null;
+  // ---------------- 性能辅助：位置查询（替代 text.slice(0, x) + 正则 / 线性扫 tokens） ----------------
+  // 背景：原实现大量使用「text.slice(0, pos) 后跑 /[.!?]\s*$/ 之类正则」判断 token 是否位于句首，
+  // 以及「for 全表扫描 tokens 找某个 start 之后的 token」。这两种写法在每个 token / 每个逗号上
+  // 都会复制一遍前缀文本或扫一遍 token 数组，长文本下整体退化为 O(n²)。
+  // 以下 helper 与原写法逐字符等价（见各函数注释），但均为 O(1)~O(log n) 且不产生中间大字符串。
+  var WS_RE = /\s/;
+
+  // 等价于 pos === 0 || /[.!?]\s*$/.test(text.slice(0, pos))：
+  // 从 pos 向前跳过空白，首个非空白字符为 . ! ? 即视为句首。
+  function isSentenceStart(text, pos) {
+    if (pos === 0) return true;
+    if (pos < 0 || pos > text.length) return false;
+    var p = pos - 1;
+    while (p >= 0 && WS_RE.test(text.charAt(p))) p--;
+    if (p < 0) return false;
+    var c = text.charAt(p);
+    return c === '.' || c === '!' || c === '?';
   }
+
+  // 等价于 /,\s*$/.test(text.slice(0, pos))：向前跳过空白后判断是否为逗号。
+  function prevIsComma(text, pos) {
+    var p = pos - 1;
+    while (p >= 0 && WS_RE.test(text.charAt(p))) p--;
+    return p >= 0 && text.charAt(p) === ',';
+  }
+
+  // 等价于 (text.slice(0, pos).match(/([A-Za-z.]+)$/) || ['', ''])[1]：
+  // 取 pos 之前紧邻的 [A-Za-z.] 字符 run（供 PUNC-004 提取句点前的单词）。
+  function trailingWordBefore(text, pos) {
+    var end = pos;
+    while (end > 0) {
+      var c = text.charAt(end - 1);
+      if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c === '.') end--;
+      else break;
+    }
+    return text.slice(end, pos);
+  }
+
+  // 等价于 text.slice(pos).match(/^(\s*)(.)/) 后取 m[2]：
+  // 返回 pos 之后首个非空白字符；若其后全是空白，返回最后一个空白字符
+  // （原正则 \s* 贪婪失败后会回溯匹配到一个空白字符，此细节必须保留：
+  //  否则「句末仅余空格的介词」的 PREP-001 判定会发生变化）；无剩余字符返回 ''。
+  function nextCharAfter(text, pos) {
+    var last = '';
+    for (var p = pos; p < text.length; p++) {
+      var c = text.charAt(p);
+      if (!WS_RE.test(c)) return c;
+      last = c;
+    }
+    return last;
+  }
+
+  // tokens 按 start 升序（分词器从左到右顺序产出，正常恒为 true）。
+  // 用 WeakMap 以数组长度为指纹缓存校验结论，避免每次调用重复 O(n) 校验。
+  var _sortedCache = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  function checkSorted(tokens) {
+    for (var i = 1; i < tokens.length; i++) {
+      if (tokens[i - 1].start > tokens[i].start) return false;
+    }
+    return true;
+  }
+  function tokensSorted(tokens) {
+    if (!_sortedCache) return checkSorted(tokens);
+    var c = _sortedCache.get(tokens);
+    if (!c || c.len !== tokens.length) {
+      c = { len: tokens.length, sorted: checkSorted(tokens) };
+      _sortedCache.set(tokens, c);
+    }
+    return c.sorted;
+  }
+  // 首个 start >= pos 的 token 下标，无则 -1（二分查找；极端乱序输入时退化为线性扫描，结果不变）
+  function firstIdxAtOrAfter(tokens, pos) {
+    if (!tokensSorted(tokens)) {
+      for (var i = 0; i < tokens.length; i++) if (tokens[i].start >= pos) return i;
+      return -1;
+    }
+    var lo = 0, hi = tokens.length;
+    while (lo < hi) { var mid = (lo + hi) >> 1; if (tokens[mid].start < pos) lo = mid + 1; else hi = mid; }
+    return lo < tokens.length ? lo : -1;
+  }
+  // 首个 start > pos 的 token 下标，无则 -1
+  function firstIdxAfter(tokens, pos) {
+    if (!tokensSorted(tokens)) {
+      for (var i = 0; i < tokens.length; i++) if (tokens[i].start > pos) return i;
+      return -1;
+    }
+    var lo = 0, hi = tokens.length;
+    while (lo < hi) { var mid = (lo + hi) >> 1; if (tokens[mid].start <= pos) lo = mid + 1; else hi = mid; }
+    return lo < tokens.length ? lo : -1;
+  }
+
+  // ---------------- 主谓一致 ----------------
+  // 注：原 nextHeadNoun() 定义后从未被调用（死代码），已移除
   function runSva(tokens, text, issues) {
     var n = tokens.length;
     // SVA-004 不定代词 + 复数谓语
@@ -114,7 +200,7 @@
       var pv = tok(tokens, v - 1), nxv = tok(tokens, v + 1);
       if (pv && (hasTag(pv, 'Gerund') || /^(has|have|had|be|been|being|am|is|are|was|were|do|does|did|will|would|can|could|may|might|must|should|shall)$/i.test(pv.text))) continue; // 助动词/情态/动名词后接的动词不作主谓判定
       if (nxv && !/^(that|which|who|whom|whose|and|or|but)$/.test(nxv.text) && !hasAnyTag(nxv, ['Verb']) && (hasAnyTag(nxv, ['Noun']) || hasTag(nxv, 'Preposition') || PREPS[nxv.text])) continue; // 后接名词/介词 → 非谓语
-      if (/,\s*$/.test(text.slice(0, tv.start))) continue; // 逗号后 → 前句谓语，交由 RUN-001
+      if (prevIsComma(text, tv.start)) continue; // 逗号后 → 前句谓语，交由 RUN-001（原为 /,\s*$/.test(text.slice(0, tv.start))）
       var coord = false, coordIdx = -1;
       for (var cc = v - 1; cc >= Math.max(0, v - 5); cc--) {
         var tc = tokens[cc];
@@ -372,7 +458,7 @@
       }
       // CONF-009 Comparing with → Compared with（句首）
       if (w === 'comparing' && nx && /^(with|to)$/.test(nx.text)) {
-        var atS9 = t.start === 0 || /[.!?]\s*$/.test(text.slice(0, t.start)) || /,\s*$/.test(text.slice(0, t.start));
+        var atS9 = isSentenceStart(text, t.start) || prevIsComma(text, t.start);
         if (atS9) addIssue(issues, { ruleId:'CONF-009', category:'confusable', confidence:'mid', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'句首表"与…相比"应用过去分词 Compared with/to（Comparing 需自带宾语）', suggestion:'Compared ' + nx.raw });
       }
       // whether → weather（前为限定词，作名词“天气”）
@@ -425,8 +511,9 @@
     // CLA-001 逗号 + that + 实义动词 → 非限制性从句应用 which/who（逗号非 token，用文本正则定位）
     var reT = /,\s*that\b/gi, mm;
     while ((mm = reT.exec(text)) !== null) {
-      var afterPos = mm.index + mm[0].length, vt = null;
-      for (var z = 0; z < n; z++) { if (tokens[z].start >= afterPos) { vt = tokens[z]; break; } }
+      var afterPos = mm.index + mm[0].length;
+      var zi = firstIdxAtOrAfter(tokens, afterPos); // tokens 按 start 升序，二分查找替代原线性全表扫描
+      var vt = zi >= 0 ? tokens[zi] : null;
       if (vt && hasTag(vt, 'Verb') && !/^(is|are|was|were)$/.test(vt.text))
         addIssue(issues, { ruleId:'CLA-001', category:'relative', confidence:'mid', start:mm.index, end:vt.end, errorText:text.slice(mm.index, vt.end), message:'非限制性定语从句用 which/who，不用 that', suggestion:'which / who' });
     }
@@ -451,13 +538,8 @@
         if (antPl && vSing) addIssue(issues, { ruleId:'CLA-002', category:'relative', confidence:'high', start:vx.start, end:vx.end, errorText:vx.raw, message:'定语从句谓语与先行词 "' + ant.raw + '"（复数）不一致，应用复数谓语', suggestion:pluralStrip(vx) });
         else if (!antPl && !vSing && !/^(are|were|have|do)$/.test(vx.text)) addIssue(issues, { ruleId:'CLA-002', category:'relative', confidence:'high', start:vx.start, end:vx.end, errorText:vx.raw, message:'定语从句谓语与先行词 "' + ant.raw + '"（单数）不一致，应用单数谓语', suggestion:singularize(vx) });
       }
-      // CLA-003 指人先行词 + which → 应用 who/that
-      if (tokens[i].text === 'which' && i > 0) {
-        var ant3 = tokens[i - 1], v3 = tokens[i + 1];
-        if (HUMAN_NOUN[ant3.text] && v3 && hasAnyTag(v3, ['Verb']) && !hasAnyTag(v3, ['Noun'])) {
-          addIssue(issues, { ruleId:'CLA-003', category:'relative', confidence:'high', start:tokens[i].start, end:tokens[i].end, errorText:tokens[i].raw, message:'先行词 "' + ant3.raw + '" 指人，关系代词应用 who（或 that），不用 which', suggestion:'who' });
-        }
-      }
+      // 注：原实现在此处又重复了一遍循环开头的 CLA-003 判定（条件完全相同，
+      // 会因 addIssue 前的重复匹配而多报一次），属复制残留，已移除；判定以循环开头的版本为准。
     }
   }
 
@@ -465,12 +547,24 @@
   function runRun(tokens, text, issues) {
     var CONJ = /^(and|but|or|so|yet|for|nor|which|who|whom|whose|that|because|although|though|since|while|when|if|unless|until|after|before|as|however|therefore|thus|moreover|nevertheless|furthermore|meanwhile|instead|otherwise|then|also|besides)$/;
     var reC = /,/g, m;
+    // 性能：原实现对每个逗号都做 4 次 text.lastIndexOf（各自回扫到句首），长文本下退化为
+    // O(逗号数 × 文本长)。改为一次 O(L) 预处理出全部句读符位置，每个逗号 O(log L) 二分查找，
+    // 结果与原 Math.max(lastIndexOf…)+1 表达式完全一致。
+    var endPos = [];
+    for (var ep = 0; ep < text.length; ep++) {
+      var ec = text.charAt(ep);
+      if (ec === '.' || ec === '!' || ec === '?' || ec === ';' || ec === ':') endPos.push(ep);
+    }
+    function lastEndBefore(cpos) {
+      var lo = 0, hi = endPos.length;
+      while (lo < hi) { var mid = (lo + hi) >> 1; if (endPos[mid] < cpos) lo = mid + 1; else hi = mid; }
+      return lo > 0 ? endPos[lo - 1] + 1 : 0;
+    }
     while ((m = reC.exec(text)) !== null) {
       var cpos = m.index;
       if (/[0-9]/.test(text.charAt(cpos - 1)) && /[0-9]/.test(text.charAt(cpos + 1))) continue; // 数字千分位逗号（23,391）
-      var a = Math.max(text.lastIndexOf('.', cpos - 1), text.lastIndexOf('!', cpos - 1), text.lastIndexOf('?', cpos - 1), text.lastIndexOf(';', cpos - 1), text.lastIndexOf(':', cpos - 1)) + 1;
-      var j = -1;
-      for (var i = 0; i < tokens.length; i++) { if (tokens[i].start > cpos) { j = i; break; } }
+      var a = lastEndBefore(cpos);
+      var j = firstIdxAfter(tokens, cpos); // 二分查找首个 start > cpos 的 token（原为线性全表扫描）
       if (j < 0) continue;
       var tk = tokens[j];
       if (CONJ.test(tk.text)) continue; // 逗号后是连词/关系词/过渡词 → 正常
@@ -483,7 +577,8 @@
         // 前段为"助动词 + -ed"构成的谓词（has changed / was introduced），且逗号后为代词主语时，仍判为逗号拼接；
         // 后段为名词列表/同位语（fuel treatments… / a standard that…）时不判
         var auxEd = false;
-        for (var ae = 0; ae < tokens.length; ae++) {
+        var aeFrom = firstIdxAtOrAfter(tokens, a); // 只需扫描 [a, cpos) 区间，原实现每个逗号都全表扫描 tokens
+        for (var ae = aeFrom; ae >= 0 && ae < j; ae++) {
           var tae = tokens[ae];
           if (tae.start < a || tae.start >= cpos) continue;
           if (!hasTag(tae, 'PastTense') || !/ed$/i.test(tae.text)) continue;
@@ -492,8 +587,7 @@
         }
         if (!auxEd || !/^(it|they|he|she|we|i|you|this|these|those)$/.test(tk.text)) continue;
       }
-      var jp = -1;
-      for (var q = 0; q < tokens.length; q++) { if (tokens[q].start >= a) { jp = q; break; } }
+      var jp = firstIdxAtOrAfter(tokens, a); // 同上，二分查找替代线性全表扫描
       if (jp >= 0 && /^(because|although|though|whereas|since|while|when|if|unless|until|as|that|which|who|whom|whose|whoever|whenever|wherever|even)$/.test(tokens[jp].text)) continue; // 前段为从句，逗号合法
       var afterFin = false;
       for (var k = j; k < tokens.length && k < j + 5; k++) { if (plainFinite(tokens[k])) { afterFin = true; break; } }
@@ -516,7 +610,8 @@
       if (head === 'since' && /\bsince\s+\d/i.test(s)) continue; // since + 年份 = 介词短语，非从句
       if (s.indexOf(',') !== -1) continue; // 有逗号，通常已含主句
       var fin = 0;
-      for (var k = 0; k < tokens.length; k++) {
+      var kFrom = firstIdxAtOrAfter(tokens, sStart), kTo = firstIdxAtOrAfter(tokens, sEnd); // 原实现每句都全表扫描 tokens 统计谓语，改为只扫本句区间
+      for (var k = kFrom; k >= 0 && k < kTo; k++) {
         var tk = tokens[k];
         if (tk.start < sStart || tk.start >= sEnd) continue;
         if (hasTag(tk, 'Verb') && (hasTag(tk, 'PresentTense') || hasTag(tk, 'PastTense')) && !hasTag(tk, 'Gerund')) fin++;
@@ -533,8 +628,7 @@
       var t = tokens[i];
       if (!(hasTag(t, 'Preposition') || PREPS[t.text])) continue;
       // 介词后必须没有宾语：跳过空白后应直接是句末标点或文本结尾
-      var m = text.slice(t.end).match(/^(\s*)(.)/);
-      var nextCh = m ? m[2] : '';
+      var nextCh = nextCharAfter(text, t.end); // 与原 /^(\s*)(.)/ 取 m[2] 等价（含全空白时回溯匹配空格的细节），但不再 slice 后半文本
       if (nextCh && !/[.!?;:]/.test(nextCh)) continue;
       // 疑问句句末介词合法（What are you looking at?），跳过
       if (/^\s*\?/.test(text.slice(t.end))) continue;
@@ -617,7 +711,7 @@
       addIssue(issues, { ruleId:'NEG-001', category:'negation', confidence:'mid', start:mn.index, end:pos + mn[1].length, errorText:mn[0], message:'双重否定：否定词 + "' + mn[1] + '" 表意重复，应用 any/anything/anybody，或去掉一个否定词', suggestion:'改用 any / anything / anybody' });
     }
     for (var i = 0; i < n; i++) {
-      var t = tokens[i], w = t.text, nx = tok(tokens, i + 1), pv = prevNonEmpty(tokens, i);
+      var t = tokens[i], w = t.text, nx = tok(tokens, i + 1); // pv 仅 form 分支用到，改为按需计算，省去每个 token 一次回扫
       // QUA-005 some/most/many/few/several/none/either/neither + the → 缺 of
       if (/^(some|most|many|few|several|none)$/.test(w) && nx && nx.text === 'the') {
         addIssue(issues, { ruleId:'QUA-005', category:'quantifier', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'"' + w + ' the" 之间缺少 of，应用 "' + w + ' of the"', suggestion:w + ' of the' });
@@ -646,8 +740,11 @@
       if (w === 'beside' && /^\s*,/.test(text.slice(t.end))) {
         addIssue(issues, { ruleId:'CONF-007', category:'confusable', confidence:'high', start:t.start, end:t.end, errorText:t.raw, message:'beside 是介词“在…旁边”，表“此外”应为 besides', suggestion:'besides' });
       }
-      if (w === 'form' && pv && /^(different|difference|away|apart|far|distinct)$/.test(pv.text) && !(nx && nx.text === 'of')) {
-        addIssue(issues, { ruleId:'CONF-007', category:'confusable', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'"different form" 应为 different from', suggestion:'from' });
+      if (w === 'form') {
+        var pv = prevNonEmpty(tokens, i);
+        if (pv && /^(different|difference|away|apart|far|distinct)$/.test(pv.text) && !(nx && nx.text === 'of')) {
+          addIssue(issues, { ruleId:'CONF-007', category:'confusable', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'"different form" 应为 different from', suggestion:'from' });
+        }
       }
       // COLL-005 prefer ... than（rather than 除外）
       if (w === 'prefer' || baseFromEd(w) === 'prefer') {
@@ -660,7 +757,7 @@
         }
       }
       // CONF-008 弱信号易混词（高精度上下文限定）
-      if (w === 'through' && (i === 0 || /[.!?]\s*$/.test(text.slice(0, t.start))) && nx && (hasAnyTag(nx, ['Pronoun']) || (hasAnyTag(nx, ['Noun']) && !isDeterminer(nx))) && tokens[i + 2] && hasAnyTag(tokens[i + 2], ['Verb'])) {
+      if (w === 'through' && isSentenceStart(text, t.start) && nx && (hasAnyTag(nx, ['Pronoun']) || (hasAnyTag(nx, ['Noun']) && !isDeterminer(nx))) && tokens[i + 2] && hasAnyTag(tokens[i + 2], ['Verb'])) {
         addIssue(issues, { ruleId:'CONF-008', category:'confusable', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'句首表“虽然”应用 though，而非 through', suggestion:'Though' });
       }
       if (w === 'accept' && nx && nx.text === 'for') {
@@ -814,7 +911,8 @@
     // PUNC-001 全角中文标点
     CJK_PUNC.lastIndex = 0;
     while ((m = CJK_PUNC.exec(text)) !== null) {
-      if (m.index === CJK_PUNC.lastIndex) CJK_PUNC.lastIndex++;
+      // 注：原实现有一行 if (m.index === CJK_PUNC.lastIndex) CJK_PUNC.lastIndex++;
+      // 对单字符匹配永为假（exec 后 lastIndex 恒为 index+1），属死代码，已移除
       addIssue(issues, { ruleId:'PUNC-001', category:'punctuation', confidence:'mid', start:m.index, end:m.index + 1, errorText:m[0], message:'英文写作应使用半角标点，"' + m[0] + '" 是全角中文标点', suggestion:'改用半角标点' });
     }
     // PUNC-002 逗号/分号/冒号后缺空格
@@ -834,7 +932,7 @@
     while ((m = re4.exec(text)) !== null) {
       var p4 = m.index;
       if (/\d/.test(text.charAt(p4 - 1))) continue;
-      var w4 = (text.slice(0, p4).match(/([A-Za-z.]+)$/) || ['', ''])[1];
+      var w4 = trailingWordBefore(text, p4); // 原写法每处「句点+大写」都 slice 整个前缀再正则匹配，改为向左扫描
       var lw = w4.replace(/\./g, '').toLowerCase();
       if (ABBR_SET[lw] || lw.length < 2) continue;
       addIssue(issues, { ruleId:'PUNC-004', category:'punctuation', confidence:'mid', start:p4, end:p4 + 1, errorText:'.', message:'句号后应有一个空格再开始下一句', suggestion:'. ' });
@@ -917,7 +1015,7 @@
         }
       }
       // EMP-004 句首否定副词 / only + 状语 → 主句部分倒装
-      var atStart = tokens[i].start === 0 || /[.!?]\s*$/.test(text.slice(0, tokens[i].start));
+      var atStart = isSentenceStart(text, tokens[i].start);
       if (atStart && (NEG_ADV[w] || w === 'only')) {
         var s = i + 1;
         if (w === 'only') {
@@ -1083,7 +1181,7 @@
         addIssue(issues, { ruleId:'DET-003', category:'determiner', confidence:'high', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'another 不能直接修饰不可数名词 "' + nx.raw + '"', suggestion:'another piece of ' + nx.raw + ' / more ' + nx.raw });
       }
       // INTJ-001 学术写作中的口语叹词
-      var atStart = t.start === 0 || /[.!?]\s*$/.test(text.slice(0, t.start));
+      var atStart = isSentenceStart(text, t.start);
       if (atStart && INTERJECTION[wl]) {
         addIssue(issues, { ruleId:'INTJ-001', category:'interjection', confidence:'mid', start:t.start, end:t.end, errorText:t.raw, message:'学术写作中不宜使用口语叹词 "' + t.raw + '"，应删除', suggestion:'删除该叹词' });
       }
@@ -1098,7 +1196,7 @@
   function runConjAdv(tokens, text, issues) {
     for (var i = 0; i < tokens.length; i++) {
       var t = tokens[i], w = t.text, wl = w.toLowerCase(), nx = tok(tokens, i + 1);
-      var atStart = t.start === 0 || /[.!?]\s*$/.test(text.slice(0, t.start));
+      var atStart = isSentenceStart(text, t.start);
       // 句首 But/And/So 属可接受写法（参考范文亦有），不判定
       // CONJ-002 like → such as（列举）
       if (wl === 'like' && nx && nx.text !== 'to' && hasAnyTag(nx, ['Noun']) && !hasAnyTag(nx, ['Verb'])) {
@@ -1147,7 +1245,7 @@
     // PRON-001 句首宾格代词作主语
     for (var i = 0; i < tokens.length; i++) {
       var t = tokens[i], w = t.text, wl = w.toLowerCase(), nx = tok(tokens, i + 1);
-      var atStart = t.start === 0 || /[.!?]\s*$/.test(text.slice(0, t.start));
+      var atStart = isSentenceStart(text, t.start);
       if (atStart && /^(me|him|her|us|them)$/.test(wl) && nx && (nx.text === 'and' || hasAnyTag(nx, ['Verb']) || MODALS[nx.text])) {
         addIssue(issues, { ruleId:'PRON-001', category:'pronoun', confidence:'mid', start:t.start, end:nx.end, errorText:text.slice(t.start, nx.end), message:'句首作主语应用主格代词（I/he/she/we/they），不能用宾格 "' + wl + '"', suggestion:'改用 I / he / she / we / they' });
       }
@@ -1209,12 +1307,9 @@
   var DAY_PARTS = {morning:1,afternoon:1,evening:1};
   var SEASONS = {summer:1,winter:1,spring:1,autumn:1,fall:1};
   var DURATION_UNITS = {year:1,years:1,month:1,months:1,week:1,weeks:1,day:1,days:1,hour:1,hours:1,decade:1,decades:1,century:1,centuries:1};
-  // 形容词/副词 + 误用介词（正确形式在值中）
-  var ADJ_PREP_ERR = {
-    'interested on':'in','interested at':'in','interested about':'in','interested for':'in',
-    'afraid from':'of','afraid with':'of','responsible of':'for','aware about':'of','capable to':'of',
-    'regardless to':'of','regarding to':'regarding'
-  };
+  // 形容词/副词 + 误用介词（正确形式在值中）：词表已迁移至 dictionaries/prepositions.js，
+  // 原此处又本地重复定义了一份同名 var（会覆盖文件头部的 D.ADJ_PREP_ERR 别名，
+  // 虽然当前内容一致，但属迁移残留），已移除，统一以词典为唯一来源
   // 兼作可数用的物质名词，many/few 不判错
   var MASS_SKIP = {fish:1,chicken:1,meat:1,beef:1,pork:1,rain:1,snow:1};
   // 不规则复数但仍属可数名词，much/less 判定时不放行

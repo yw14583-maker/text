@@ -11,12 +11,25 @@
 
   var PROTECT_RANGES = [];
 
+  // 编译缓存：FIXED_PHRASES 是静态词表，原实现每次 buildProtectRanges 都把约 150 个短语
+  // 重新 split/escape/编译成正则对象；缓存后仅首次编译，后续调用直接复用（行为不变）。
+  var compiledCache = null, compiledFor = null;
+  function getCompiled() {
+    var list = dict.FIXED_PHRASES || [];
+    if (compiledCache && compiledFor === list) return compiledCache;
+    compiledCache = list.map(function (ph) {
+      var words = ph.split(/\s+/).map(function (w) { return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
+      return new RegExp('\\b' + words.join('[\\s\\-]+') + '\\b', 'gi');
+    });
+    compiledFor = list;
+    return compiledCache;
+  }
   function buildProtectRanges(text) {
     PROTECT_RANGES = [];
-    var list = dict.FIXED_PHRASES || [];
-    for (var i = 0; i < list.length; i++) {
-      var words = list[i].split(/\s+/).map(function (w) { return w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); });
-      var re = new RegExp('\\b' + words.join('[\\s\\-]+') + '\\b', 'gi');
+    var compiled = getCompiled();
+    for (var i = 0; i < compiled.length; i++) {
+      var re = compiled[i];
+      re.lastIndex = 0; // /g 正则有状态，复用前必须重置
       var m;
       while ((m = re.exec(text)) !== null) {
         PROTECT_RANGES.push([m.index, m.index + m[0].length]);

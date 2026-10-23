@@ -19,15 +19,31 @@
     RULES.push({ fn: fn, always: !!(opts && opts.always) });
   }
 
+  // 去重索引：以 issues 数组为键缓存 "ruleId@start:end" 集合。
+  // 原实现每次 addIssue 都线性扫描已累计的问题列表，问题量大时整体为 O(I²)；
+  // 改为 O(1) 查找（语义完全一致：同规则同位置只保留第一条）。
+  var dedupIndex = (typeof WeakMap === 'function') ? new WeakMap() : null;
+  function alreadySeen(issues, key) {
+    if (!dedupIndex) { // 无 WeakMap 的老环境退化为原线性扫描
+      for (var i = 0; i < issues.length; i++) {
+        if (issues[i].ruleId + '@' + issues[i].start + ':' + issues[i].end === key) return true;
+      }
+      return false;
+    }
+    var set = dedupIndex.get(issues);
+    if (!set) { set = (typeof Set === 'function') ? new Set() : {}; dedupIndex.set(issues, set); }
+    if (typeof Set === 'function' && set instanceof Set) { if (set.has(key)) return true; set.add(key); return false; }
+    if (set[key]) return true; // 对象模拟 Set；key 含 '@' 不会撞上原型属性
+    set[key] = 1;
+    return false;
+  }
   function addIssue(issues, o) {
     // 固定搭配白名单：命中区间内一律放行；但主谓一致/助动词类规则的落点是动词本身，
     // 会被 "is consistent with" 这类短语整体吞掉，故这两类不过白名单
     var exempt = o.category === 'sva' || o.category === 'auxiliary';
     if (!exempt && protect.isProtected(o.start || 0, o.end || 0)) return;
     // 仅去掉同一规则在同一位置的重复提示；同一规则在不同位置可分别报出
-    for (var i = 0; i < issues.length; i++) {
-      if (issues[i].ruleId === o.ruleId && issues[i].start === (o.start || 0) && issues[i].end === (o.end || 0)) return;
-    }
+    if (alreadySeen(issues, o.ruleId + '@' + (o.start || 0) + ':' + (o.end || 0))) return;
     issues.push({
       start: o.start || 0,
       end: o.end || 0,
