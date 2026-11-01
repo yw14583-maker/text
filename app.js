@@ -146,7 +146,178 @@ const PROFILE_CONFIG =Object.freeze({
         }
     ];
 
-    // 各篇参考范文中的固定搭配（英文｜中文释义），按题目 id 绑定
+    // 参考范文分段：按中文提纲要点切分英文句子（标签与 directions 中的 背景/目的/方法/结果/结论 对应；
+    // 一句同时承担两个要点时用 "/" 连接），仅用于「参考答案」展示，不参与评分。
+    const QUESTION_SEGMENTS = {
+        1: [
+            ["背景", "Robots have made great progress in moving around, but they are still not as flexible and quick as animals when moving through complex environments. This limits their use in places where they could be very helpful. Most robots depend on complex sensing systems to understand their surroundings."],
+            ["目的", "A better approach is to let robots change their body shape to fit the environment."],
+            ["方法", "In this study, we developed a robot that can actively change its shape. It can switch between a flat form and a round form, which allows it to drive, roll, and swim across different types of ground. The robot does not need many sensors because its flexible body can naturally adapt to the environment."],
+            ["结果", "We tested the robot on a 4.5-kilometer path across mountains, water, and city streets. It performed better than traditional robots in terms of flexibility, energy use, and reliability."],
+            ["结论", "This kind of robot could be useful for many tasks, such as monitoring the environment, responding to disasters, and exploring other planets."]
+        ],
+        2: [
+            ["背景", "Garbage classification, a significant part of environment protection, has drawn increasing attention of both the public and the government."],
+            ["目的", "In order to explore the effectiveness of the current regulation on garbage classification in Shanghai,"],
+            ["方法", "a survey via questionnaires (n=300) was conducted in May, 2015 among residents and sanitation workers in Shanghai on their awareness of and attitudes toward garbage classification. An interview was also conducted in some housing estates and garbage management stations."],
+            ["结果", "The study reveals that despite most respondents’ awareness of the benefits of garbage classification, only 31% of them have formed such a good habit. Lack of the awareness of environment protection is the primary reason for the gap. Respondents’ poor knowledge of the garbage management and classification is also to blame."]
+        ],
+        3: [
+            ["背景", "Attending classes and sleeping well are important for students’ academic success."],
+            ["目的", "Here, we tested whether early morning classes are associated with lower attendance, shorter sleep and poorer academic achievement by analyzing university students’ digital traces."],
+            ["方法/结果", "Wi-Fi connection logs in 23,391 students revealed that lecture attendance was about ten percentage points lower for classes at 08:00 compared with later start times."],
+            ["方法/结果", "Diurnal patterns of Learning Management System logins in 39,458 students and actigraphy data in 181 students demonstrated that nocturnal sleep was an hour shorter for early classes because students woke up earlier than usual."],
+            ["结果", "Analyses of grades in 33,818 students showed that the number of days per week they had morning classes was negatively correlated with grade point average."],
+            ["结论", "These findings suggest concerning associations between early morning classes and learning outcomes."]
+        ],
+        4: [
+            ["背景", "Climate change is expected to cause irreversible changes to biodiversity, but predicting those risks remains uncertain."],
+            ["目的/方法", "I synthesized 485 studies and more than 5 million projections to produce a quantitative global assessment of climate change extinctions."],
+            ["结果", "With increased certainty, this meta-analysis suggests that extinctions will accelerate rapidly if global temperatures exceed 1.5°C. The highest-emission scenario would threaten approximately one-third of species, globally. Amphibians; species from mountain, island, and freshwater ecosystems; and species inhabiting South America, Australia, and New Zealand face the greatest threats."],
+            ["结果", "In line with predictions, climate change has contributed to an increasing proportion of observed global extinctions since 1970."],
+            ["结论", "Besides limiting greenhouse gases, pinpointing which species to protect first will be critical for preserving biodiversity until anthropogenic climate change is halted and reversed."]
+        ],
+        5: [
+            ["背景", "China’s rapid economic development has triggered an unparalleled freshwater biodiversity crisis since the 1950s. To restore fisheries resources, the Yangtze River Fishing Ban was implemented in 2021 to cease all basin-wide commercial fishing."],
+            ["目的", "We evaluate the effectiveness of this large-scale conservation action"],
+            ["方法", "by assessing fish communities across main-stem habitats before and after the ban (2018 to 2023)."],
+            ["结果", "The seven-decadal biodiversity loss was halted with improvements in fish biomass, body condition, species diversity, and initial recovery of threatened species."],
+            ["结论", "Eliminating fishing pressure was likely key to this recovery, in addition to actions targeting water quality improvement, hydrological and riparian habitat restoration, and vessel traffic reduction. Ambitious conservation actions can halt biodiversity loss in the Yangtze River, bringing hope for biodiversity recovery in other large rivers."]
+        ],
+        6: [
+            ["背景", "Global obesity reports usually rely on long-term comparisons and lack detailed dynamic analysis."],
+            ["目的/方法", "Based on height and weight data from 232 million participants across 4,050 population-based studies, this study analyzed global obesity trends from 1980 to 2024."],
+            ["结果", "In high-income countries, the rising obesity rate among children and adolescents slowed in the 1990s and later plateaued, with slight declines observed after 2000. Adult obesity growth followed a similar but delayed slowing trend. Obesity prevalence continues to rise or remain high in most low- and middle-income countries."],
+            ["结论", "The distinct global obesity trends are driven by social, economic and technological differences related to food access and consumption, indicating targeted policy interventions are essential for less developed regions."]
+        ],
+        7: [
+            ["背景", "Nature paintings can provoke dynamic emotional experiences. However, their therapeutic potential beyond merely inducing positive emotions remains underexplored."],
+            ["方法", "Informed by the externalization technique from post-trauma therapy, we stimulate both negative and positive emotional experiences through visual engagement with nature paintings."],
+            ["目的", "Further, we investigate their potential in supporting healing, along with the influence of personal traits and the severity of illness."],
+            ["方法", "Using 16 expert-curated paintings depicting distinctive emotions, we take a guided art therapy approach. Participants reflected on past illnesses and imagined healing journeys using negative and positive paintings of their choice, respectively."],
+            ["结果", "The result of an online experiment yielded significant mood enhancement after the guided art therapy, with the effect being significantly stronger in the lower resilience group. Qualitative analysis revealed six themes that conceptualize individuals’ traumatic experiences and seven themes for healing experiences. The severity of illness influenced which of these themes were dominant in art-induced healing experiences."],
+            ["结论", "Integrating diverse pathways to healing, we introduce a conceptual framework and discuss design implications for creating personalized healing experiences."]
+        ],
+        8: [
+            ["背景", "Characterizing the factors that have shaped linguistic diversity is fundamental for understanding human history, culture, and cognition."],
+            ["目的/方法", "In this study, we combined statistical and social computational modeling to model trajectories of global linguistic diversity."],
+            ["结果", "Before the onset of plant and animal domestication, the number of languages was smaller than it is today. Subsequent increases in global population precipitated increased linguistic diversity. We uncovered a linguistic “golden age” with tens of thousands of languages 3000 to 1000 years ago. Great loss of linguistic diversity did not begin with recent colonial expansion but as multinational empires first spread along with their languages and cultures."],
+            ["结论", "Thus, extinction has likely played a much greater role in shaping linguistic and cultural diversity than previously thought."]
+        ],
+        9: [
+            ["背景", "Aging is associated with changes in circulating levels of various molecules, some of which remain undefined."],
+            ["方法/结果", "We find that concentrations of circulating taurine decline with aging in mice, monkeys, and humans."],
+            ["方法/结果", "A reversal of this decline through taurine supplementation increased the health span and life span in mice and health span in monkeys. We, therefore, investigated the health of taurine-fed middle-aged mice and found an improved functioning of bone, muscle, brain, fat and immune system, indicating an overall improvement in health."],
+            ["结果", "In humans, lower taurine concentrations correlated with several age-related diseases and taurine concentrations increased after acute endurance exercise."],
+            ["结论", "Thus, taurine deficiency may be a driver of aging because its reversal increases health span in worms, rodents, and primates and life span in worms and rodents. To test whether taurine deficiency is a driver of aging in humans as well, long-term, well-controlled taurine supplementation trials are needed."]
+        ],
+        10: [
+            ["背景", "Design and aesthetics have always been in a relationship with emerging technology and materials, as each advancement in technology offered and required new opportunities for design and aesthetics."],
+            ["目的", "In this piece I want to offer my perspective on how Artificial Intelligence and its technologies can relate to design and aesthetics."],
+            ["方法", "Through design exemplars, I will trace my own journey and aesthetic values across three previous waves of design aesthetics: appearance, interaction, and transformation,"],
+            ["结果", "to arrive at a fourth wave of \"aesthetics of intelligence.\""],
+            ["结论", "I will propose five principles that might help to offer an aesthetic compass for navigating these challenging times."]
+        ],
+        11: [
+            ["背景", "Global tourism is booming, and so is demand for air travel. Recognizing that travelers come with a carbon footprint increases the complexity of decision-making for destinations that seek to attract more visitors. The carbon risk inherent in travel to and from a destination could be substantial but current approaches of accounting and lack of transparent data impede a full understanding of exposure and trends."],
+            ["目的/方法", "This research therefore takes a demand-focused approach and proposes ten carbon risk indicators that help destinations assess their absolute and relative risk to the economic, financial, social, and environmental costs of carbon."],
+            ["结果", "The analysis generates global benchmarks for carbon-, passenger- and itinerary-related indicators, and presents a list of most exposed destinations, approximated by departure airports."],
+            ["结果", "A comparative assessment of four airports highlights how differences in passenger volumes, geography, route network and travel behaviour by markets influence exposure."],
+            ["结论", "Recommendations for destinations are provided."]
+        ],
+        12: [
+            ["背景", "In the context of a fast aging population, widespread usage of smart wearable systems can alleviate the social burden caused by the increasing need of older adults for healthcare and assistance."],
+            ["目的", "To facilitate and encourage the use of smart wearable systems among older adults, this study investigated the factors that contribute to the acceptance of such systems,"],
+            ["方法", "and smart wearables acceptance model for older adults was developed using structural equation modeling. The model was validated using 146 survey samples collected from adults aged 60 years and above."],
+            ["结果", "The results indicated that perceived usefulness, compatibility, facilitating conditions, and self-reported health status significantly and positively affect older adults’ intention to use such technologies."],
+            ["结论", "Useful implications and insights were provided to future researchers and practitioners to enhance older adults’ acceptance of smart wearable systems."]
+        ],
+        13: [
+            ["背景", "Biotechnology has now been used in food production. But it might impact human health negatively. Consumers’ attitudes toward GM (genetically modified) foods are important for policy makers."],
+            ["目的", "The paper attempts to find to which extent college students will accept GM foods and whether their attitudes toward GM foods are product-specific or not."],
+            ["方法", "A survey was conducted in a total of 210 students with different academic backgrounds at Fudan University and Tongji University."],
+            ["结果", "The result shows that there is a great difference between the attitudes toward GM foods of students with or without an academic background of biology and medicine. It also suggests that the acceptance of GM foods is product-specific and that taste and health are two factors affecting college students’ choice. Price is also a factor which influences students’ willingness to purchase GM foods."]
+        ],
+        14: [
+            ["背景", "The growing popularity of emoji has drawn attention to social media interactions, including within the context of health information."],
+            ["目的", "This study explored and analyzed the usage patterns of emoji in relation to health information"],
+            ["方法", "by arranging a focus group and conducting a design experiment. To this end, we created a micro-database of 69 health-themed emoji representing various parts of speech; specifically, they could function as nouns, verbs, and adjectives simultaneously."],
+            ["方法", "An information design experiment was conducted to investigate how emoji could be used as a visual language to assist in the design and communication of health information."],
+            ["结果", "Our analysis yielded several important findings, including (1) recommendations regarding the quantity, frequency, and placement of emoji in health information; (2) an examination of the denotative aspects of emoji-word integration in visual language."],
+            ["结论", "This study constitutes a first step in understanding the design application paradigms of emoji in health communication and provides detailed theoretical insights into visual health communication as well as practical implications for information design."]
+        ],
+        15: [
+            ["目的", "This paper investigates whether sugar, especially refined sugar so prevalent in food nowadays, is more of a health risk than a health benefit."],
+            ["背景", "Sugar can be found, both naturally and artificially, in almost all aspects of the modern diet, and the over-consumption of sugar is a cause for concern in the modern world."],
+            ["方法", "The paper examines the origins of sugar in the human diet and then considers some of the nutritional properties of sugar. Based on the conclusions of various scientific research papers,"],
+            ["结果", "it is argued that sugar, especially in its refined state, is responsible for creating a vicious cycle of consumption and a range of disturbing conditions and illnesses."],
+            ["结论", "The paper concludes by strongly suggesting that everybody should reflect on their diet and, if need be, reduce their sugar intake in order to maintain a healthy life."]
+        ],
+        16: [
+            ["背景/目的", "The purpose of this study is to determine the status of work experience programs of college students and to suggest a measure for the future improvement of the work experience."],
+            ["方法", "A survey was conducted to the currently enrolled students of college and universities and those who graduated in 2015, and 1,459 respondents were collected and analyzed."],
+            ["结果", "These college students who had work experiences showed significant differences in satisfaction according to the absence or presence of salaries and written employment contracts, and they also displayed differences in terms of the types of jobs they performed depending on the participation period. Also they called for improvement of salaries, discriminative treatment and safety of work experience programs."],
+            ["结论", "In order to improve future work experience programs, it is necessary to establish institutional protection measures by reflecting those demands."]
+        ],
+        17: [
+            ["目的", "The present study reports attitudes towards genetically modified (GM) foods among Swedish consumers."],
+            ["方法", "A random nation-wide sample of 2,000 addresses, aged 18-65 years, were mailed a questionnaire and 786 responded."],
+            ["结果", "Most of these consumers were rather negative about GM foods. However, males, younger respondents and those with higher level of education were more positive than were females, older respondents and those with lower level of education. A majority of the consumers had moral and ethical doubts about eating GM foods and did not perceive attributes like better taste or lower price as beneficial enough to persuade them to purchase GM foods. However, tangible benefits, like being better for the environment or healthier, seemed to increase willingness to purchase GM foods."]
+        ],
+        18: [
+            ["背景", "Wildfires are among the most pressing environmental challenges of the 21st century, intensified by the accumulation of forest fuels after a century of fire suppression policies. Although fuel-reduction treatments are a primary tool for reducing wildfire risk, they remain underutilized, partly owing to limited evidence of their economic value."],
+            ["目的/方法", "In this study, we integrated high-resolution data on wildfires, fuel treatments, suppression effort, and damages across the Western United States to assess their cost-effectiveness."],
+            ["方法", "Using a quasi-experimental design,"],
+            ["结果", "we found that fuel treatments reduced wildfire spread and severity, avoiding an estimated $2.8 billion in damages by limiting structure loss, cutting carbon dioxide emissions, and lowering fine particulate matter (PM2.5) exposure. Each dollar invested yielded $3.73 in expected benefits."],
+            ["结论", "Our findings demonstrate the value of fuel treatment investments and offer guidance for maximizing their effectiveness."]
+        ],
+        19: [
+            ["背景", "Invasive alien species (IAS) are a major threat to biodiversity, yet their impact distribution remains poorly understood. Global biodiversity assessments suggest the highest impacts in wealthy countries of the Global North, but this is only inferred from IAS numbers, reflecting research bias."],
+            ["方法", "Using a new global database of standardized impact measures, we calculated average impact severity per country"],
+            ["结果", "and found that it is higher in the Global South despite more than twice as many reports in the Global North. Weak governance and limited management capacity are the main drivers of high impact severity. Emerging economies with rapid economic growth but poor governance are particularly vulnerable."],
+            ["结论", "Failure to recognize the Global South as facing the highest IAS impacts diverts attention away from the most threatened regions."]
+        ],
+        20: [
+            ["背景", "More than 65 years ago, complex clinical diagnostic reasoning cases were introduced as the gold standard for the evaluation of expert medical computing systems, a standard that has held ever since."],
+            ["目的", "In this study, we report the results of a physician evaluation of a large language model (LLM) on challenging clinical cases across five experiments with a baseline of hundreds of physicians."],
+            ["方法", "We then report a real-world study comparing human expert and artificial intelligence (AI) second opinions in randomly selected patients in the emergency room of a major tertiary academic medical center."],
+            ["结果", "In all experiments, the LLM outperformed physician baselines and displayed continued improvement from prior generations of AI clinical decision support."],
+            ["结论", "Our study suggests that LLMs have eclipsed most benchmarks of clinical reasoning, motivating the urgent need for prospective trials."]
+        ]
+    };
+
+    // 从 directions 中提取中文提纲要点（背景/目的/方法/结果/结论）
+    function outlinePoints(q) {
+        const out = {};
+        (q.directions || '').split('\n').forEach(line => {
+            const m = line.trim().match(/^(背景|目的|方法|结果|结论)：\s*(.+)$/);
+            if (m) out[m[1]] = m[2];
+        });
+        return out;
+    }
+
+    // 渲染分段参考答案：中文要点在上，对应英文句群在下
+    function renderAbstract(q) {
+        const box = document.getElementById('qAbstract');
+        const segs = QUESTION_SEGMENTS[q.id];
+        if (!segs || !segs.length) {
+            box.classList.remove('seg-mode');
+            box.innerText = q.abstract;
+            return;
+        }
+        const zh = outlinePoints(q);
+        box.classList.add('seg-mode');
+        box.innerHTML = segs.map(function (seg) {
+            const zhLines = seg[0].split('/').map(function (k) {
+                return zh[k] ? '<div>' + escapeHtml(k + '：' + zh[k]) + '</div>' : '';
+            }).join('');
+            return '<div class="abs-seg">' +
+                '<div class="abs-seg-zh">' + zhLines + '</div>' +
+                '<div class="abs-seg-en">' + escapeHtml(seg[1]) + '</div>' +
+                '</div>';
+        }).join('');
+    }
+
     const QUESTION_COLLOCATIONS = {
         1: [
             "make great progress in｜在……方面取得巨大进展",
@@ -451,7 +622,7 @@ const PROFILE_CONFIG =Object.freeze({
 
         document.getElementById('qTitle').innerText = q.title;
         document.getElementById('qDirections').innerText = q.directions;
-        document.getElementById('qAbstract').innerText = q.abstract;
+        renderAbstract(q);
         document.getElementById('qKeywords').innerText = q.keywords;
 
         document.getElementById('userAnswer').value =savedAnswers[q.id]|| '';

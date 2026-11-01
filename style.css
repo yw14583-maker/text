@@ -413,6 +413,24 @@ mark.g-susp { background: rgba(196, 142, 43, .16); color: #8a5c17; border-bottom
 }
 .keywords { font-style: italic; color: var(--muted); }
 
+/* 参考范文分段：中文要点 → 对应英文句群 */
+.abstract-text.seg-mode { padding: 14px 16px; }
+.abs-seg {
+    padding: 2px 0 2px 11px;
+    border-left: 3px solid var(--line-strong);
+    margin-bottom: 13px;
+}
+.abs-seg:last-child { margin-bottom: 0; }
+.abs-seg-zh {
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: var(--muted);
+    margin-bottom: 4px;
+    font-family: var(--font-body);
+}
+.abs-seg-zh div { margin-bottom: 1px; }
+.abs-seg-en { line-height: 1.75; color: var(--body); }
+
 @media (max-width: 680px) {
     body { padding: 10px 8px; }
     .container { padding: 18px 14px; border-radius: 12px; }
